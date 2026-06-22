@@ -2,7 +2,7 @@ import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import {
   Upload as UploadIcon, Monitor, CheckCircle, AlertTriangle, X, Loader2,
   ArrowRight, FileVideo, Image as ImageIcon, ChevronDown, ChevronUp, Server, Inbox, Download, Layers,
-  Settings2, Plus, Trash2, RotateCcw, FileDown, FileUp, FileText,
+  Settings2, Plus, Trash2, RotateCcw, FileDown, FileUp, FileText, Cloud, CloudUpload, Loader2 as Spinner,
 } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { analyzeMediaLocally } from '../utils/mediaInfo';
@@ -32,6 +32,8 @@ function RatioBox({ w, h, tone = 'indigo' }: { w?: number; h?: number; tone?: 'i
 type FileEntry = { id: string; file: File; analyzing: boolean; metadata?: Content; error?: string };
 
 const LS_KEY = 'tk_playlists_v4';
+// Merkezi (bulut) ekran listesi API'si — web ve masaüstü aynı kaynağı kullanır.
+const CLOUD_API = 'https://terminal-atama.vercel.app/api/playlists';
 
 function loadPlaylists(): EditablePlaylist[] {
   try {
@@ -69,9 +71,62 @@ export default function Atama() {
   const [generatingFoy, setGeneratingFoy] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
 
+  // Bulut senkron durumu
+  const [cloudState, setCloudState] = useState<'loading' | 'cloud' | 'local' | 'offline'>('loading');
+  const [adminPw, setAdminPw] = useState('');
+  const [savingCloud, setSavingCloud] = useState(false);
+  const [cloudMsg, setCloudMsg] = useState('');
+
   useEffect(() => {
     try { localStorage.setItem(LS_KEY, JSON.stringify(editablePlaylists)); } catch { /* ignore */ }
   }, [editablePlaylists]);
+
+  // Açılışta merkezi listeyi çek (varsa onu kullan — herkes aynı listeyi görür)
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const r = await fetch(CLOUD_API, { cache: 'no-store' });
+        if (!r.ok) throw new Error('http ' + r.status);
+        const data = await r.json();
+        if (cancelled) return;
+        if (Array.isArray(data.playlists) && data.playlists.length) {
+          setEditablePlaylists(data.playlists.map((p: any, i: number) => ({
+            id: String(p.id || 'pl_' + i),
+            name: String(p.name ?? 'Playlist'),
+            targetWidth: Number(p.targetWidth) || 0,
+            targetHeight: Number(p.targetHeight) || 0,
+            controllerNames: Array.isArray(p.controllerNames) ? p.controllerNames.map(String) : [],
+            screenCount: Number(p.screenCount) || 1,
+          })));
+          setCloudState('cloud');
+        } else {
+          setCloudState('local'); // bulut boş → yerel/varsayılan kullanılıyor
+        }
+      } catch {
+        if (!cancelled) setCloudState('offline'); // ulaşılamadı → yerel önbellek
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const saveToCloud = async () => {
+    if (!adminPw) { setCloudMsg('Önce admin şifresini gir.'); return; }
+    setSavingCloud(true); setCloudMsg('');
+    try {
+      const r = await fetch(CLOUD_API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-admin-password': adminPw },
+        body: JSON.stringify({ playlists: editablePlaylists }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (r.ok) { setCloudState('cloud'); setCloudMsg('✓ Buluta kaydedildi — tüm kullanıcılar artık bu listeyi görecek.'); }
+      else if (r.status === 401) setCloudMsg('Şifre hatalı.');
+      else setCloudMsg('Hata: ' + (data.error || ('HTTP ' + r.status)));
+    } catch {
+      setCloudMsg('Sunucuya ulaşılamadı (internet?).');
+    } finally { setSavingCloud(false); }
+  };
 
   const playlists = useMemo(() => editablePlaylists.map(hydratePlaylist), [editablePlaylists]);
   const totalScreens = editablePlaylists.reduce((a, p) => a + (p.screenCount || 0), 0);
@@ -225,14 +280,21 @@ export default function Atama() {
           >
             <span className="flex items-center gap-2 font-bold text-slate-800">
               <Settings2 size={18} className="text-primary" /> Ekran / Playlist Yönetimi
-              <span className="text-xs font-normal text-slate-400 ml-1">· {editablePlaylists.length} playlist · LED sistemiyle eşitlemek için düzenleyebilirsin</span>
+              <span className="text-xs font-normal text-slate-400 ml-1">· {editablePlaylists.length} playlist</span>
+              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ml-1 flex items-center gap-1 ${
+                cloudState === 'cloud' ? 'bg-emerald-50 text-emerald-700 border-emerald-200' :
+                cloudState === 'loading' ? 'bg-slate-50 text-slate-500 border-slate-200' :
+                'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                <Cloud size={11} />
+                {cloudState === 'cloud' ? 'Bulut (senkron)' : cloudState === 'loading' ? 'Bulut yükleniyor…' : cloudState === 'local' ? 'Yerel (bulut boş)' : 'Çevrimdışı (yerel)'}
+              </span>
             </span>
             {editing ? <ChevronUp size={18} className="text-slate-400" /> : <ChevronDown size={18} className="text-slate-400" />}
           </button>
           {editing && (
             <div className="border-t border-slate-100 p-5 space-y-3">
-              <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-                Not: Varsayılan değerler eski veritabanı dökümünden geldi ve gerçek LED sistemiyle birebir olmayabilir. Doğru çözünürlük/cihazları buradan gir; tarayıcında kaydedilir.
+              <div className="text-[11px] text-slate-600 bg-slate-50 border border-slate-200 rounded-lg px-3 py-2">
+                Düzenle, sonra <b>Buluta Kaydet</b> (admin şifresiyle) → değişiklik tüm kullanıcılara anında yansır. Kaydetmezsen yaptığın değişiklik yalnızca bu tarayıcıda kalır.
               </div>
               {editablePlaylists.map((p) => (
                 <div key={p.id} className="border border-slate-200 rounded-xl p-3">
@@ -279,6 +341,18 @@ export default function Atama() {
                   </div>
                 </div>
               ))}
+              <div className="flex flex-wrap items-center gap-2 bg-primary/5 border border-primary/20 rounded-lg p-2.5">
+                <CloudUpload size={16} className="text-primary" />
+                <span className="text-sm font-semibold text-slate-700">Buluta Kaydet (Admin):</span>
+                <input type="password" value={adminPw} onChange={(e) => setAdminPw(e.target.value)} placeholder="Admin şifresi"
+                  className="px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm w-44 focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" />
+                <button onClick={saveToCloud} disabled={savingCloud}
+                  className="flex items-center gap-1.5 text-sm font-semibold bg-primary text-white hover:bg-primary/90 px-3 py-1.5 rounded-lg transition-colors disabled:opacity-60">
+                  {savingCloud ? <Spinner size={15} className="animate-spin" /> : <CloudUpload size={15} />} Buluta Kaydet
+                </button>
+                {cloudMsg && <span className={`text-xs font-medium ${cloudMsg.startsWith('✓') ? 'text-emerald-600' : 'text-rose-600'}`}>{cloudMsg}</span>}
+              </div>
+
               <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-slate-100 mt-1">
                 <button onClick={addRow} className="flex items-center gap-1.5 text-sm font-medium text-primary hover:bg-primary/10 px-3 py-1.5 rounded-lg transition-colors">
                   <Plus size={16} /> Yeni Playlist
