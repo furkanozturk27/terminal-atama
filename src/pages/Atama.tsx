@@ -448,50 +448,6 @@ export default function Atama() {
           </div>
         )}
 
-        {/* Dosya Adı Üretici */}
-        {renameRows.length > 0 && (
-          <Section title="Dosya Adı Üretici" subtitle="Yüklemeden, kopyala-yapıştır için hazır adlar" icon={Tag}>
-            <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-4">
-              <div className="flex-1">
-                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Marka / Kampanya</label>
-                <input
-                  value={renameLabel}
-                  onChange={(e) => setRenameLabel(e.target.value)}
-                  placeholder="Örn: TURKCELL KAMPANYA"
-                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none uppercase"
-                />
-                <p className="text-[11px] text-slate-400 mt-1">Her dosyanın başına bu gelir, sonuna otomatik <b>_GENİŞLİKxYÜKSEKLİK</b> eklenir.</p>
-              </div>
-              <button
-                onClick={() => copyText(renameRows.map((r) => r.name).join('\n'), '__all')}
-                className="flex items-center justify-center gap-1.5 text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                {copiedKey === '__all' ? <Check size={15} /> : <Copy size={15} />}
-                {copiedKey === '__all' ? 'Kopyalandı' : 'Tümünü Kopyala'}
-              </button>
-            </div>
-            <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
-              {renameRows.map((r) => (
-                <div key={r.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-mono text-sm font-semibold text-slate-800 truncate" title={r.name}>{r.name}</div>
-                    <div className="text-[11px] text-slate-400 truncate" title={r.original}>
-                      {r.original}{r.screen ? <span className="text-slate-500"> · {r.screen}</span> : <span className="text-rose-500"> · eşleşmedi</span>}
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => copyText(r.name, r.id)}
-                    className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors flex-shrink-0 ${copiedKey === r.id ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'text-slate-600 border-slate-200 hover:bg-slate-100'}`}
-                  >
-                    {copiedKey === r.id ? <Check size={13} /> : <Copy size={13} />}
-                    {copiedKey === r.id ? 'Kopyalandı' : 'Kopyala'}
-                  </button>
-                </div>
-              ))}
-            </div>
-          </Section>
-        )}
-
         {/* Atama Planı */}
         {result.assignments.length > 0 && (
           <Section title="Atama Planı" subtitle="Her içerik için önerilen playlist" icon={ArrowRight}>
@@ -626,6 +582,50 @@ export default function Atama() {
             })}
           </div>
         </Section>
+
+        {/* Dosya Adı Üretici (en altta) */}
+        {renameRows.length > 0 && (
+          <Section title="Dosya Adı Üretici" subtitle="Yüklemeden, kopyala-yapıştır için hazır adlar" icon={Tag}>
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-4">
+              <div className="flex-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Marka / Kampanya</label>
+                <input
+                  value={renameLabel}
+                  onChange={(e) => setRenameLabel(e.target.value)}
+                  placeholder="Örn: TURKCELL KAMPANYA"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none uppercase"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">Her dosyanın başına bu gelir, sonuna otomatik <b>_GENİŞLİKxYÜKSEKLİK</b> eklenir.</p>
+              </div>
+              <button
+                onClick={() => copyText(renameRows.map((r) => r.name).join('\n'), '__all')}
+                className="flex items-center justify-center gap-1.5 text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                {copiedKey === '__all' ? <Check size={15} /> : <Copy size={15} />}
+                {copiedKey === '__all' ? 'Kopyalandı' : 'Tümünü Kopyala'}
+              </button>
+            </div>
+            <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+              {renameRows.map((r) => (
+                <div key={r.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-sm font-semibold text-slate-800 truncate" title={r.name}>{r.name}</div>
+                    <div className="text-[11px] text-slate-400 truncate" title={r.original}>
+                      {r.original}{r.screen ? <span className="text-slate-500"> · {r.screen}</span> : <span className="text-rose-500"> · eşleşmedi</span>}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => copyText(r.name, r.id)}
+                    className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors flex-shrink-0 ${copiedKey === r.id ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                  >
+                    {copiedKey === r.id ? <Check size={13} /> : <Copy size={13} />}
+                    {copiedKey === r.id ? 'Kopyalandı' : 'Kopyala'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </Section>
+        )}
       </div>
     </div>
   );
