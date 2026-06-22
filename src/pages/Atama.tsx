@@ -3,6 +3,7 @@ import {
   Upload as UploadIcon, Monitor, CheckCircle, AlertTriangle, X, Loader2,
   ArrowRight, FileVideo, Image as ImageIcon, ChevronDown, ChevronUp, Server, Inbox, Download, Layers,
   Settings2, Plus, Trash2, RotateCcw, FileDown, FileUp, FileText, Cloud, CloudUpload, Loader2 as Spinner,
+  Tag, Copy, Check,
 } from 'lucide-react';
 import { pdf } from '@react-pdf/renderer';
 import { analyzeMediaLocally } from '../utils/mediaInfo';
@@ -76,6 +77,10 @@ export default function Atama() {
   const [adminPw, setAdminPw] = useState('');
   const [savingCloud, setSavingCloud] = useState(false);
   const [cloudMsg, setCloudMsg] = useState('');
+
+  // Dosya adı üretici (toplu yeniden adlandırma yardımcısı)
+  const [renameLabel, setRenameLabel] = useState('');
+  const [copiedKey, setCopiedKey] = useState<string | null>(null);
 
   useEffect(() => {
     try { localStorage.setItem(LS_KEY, JSON.stringify(editablePlaylists)); } catch { /* ignore */ }
@@ -172,6 +177,31 @@ export default function Atama() {
   const removeEntry = (id: string) => setEntries((prev) => prev.filter((e) => e.id !== id));
   const fileById = (cid: string) => entries.find((e) => e.id === cid)?.file;
   const hasResults = result.assignments.length + result.unmatchedContents.length > 0;
+
+  // --- Dosya adı üretici ---
+  const assignmentByContent = useMemo(
+    () => new Map(result.assignments.map((a) => [a.content.id, a])),
+    [result]
+  );
+  const makeName = (e: FileEntry): string | null => {
+    const m = e.metadata;
+    if (!m?.width || !m?.height) return null;
+    const ext = (e.file.name.match(/\.[a-z0-9]+$/i)?.[0] || '').toLowerCase();
+    const brand = renameLabel.trim().toLocaleUpperCase('tr-TR').replace(/\s+/g, ' ');
+    const base = brand ? `${brand}_${m.width}x${m.height}` : `${m.width}x${m.height}`;
+    return base + ext;
+  };
+  const renameRows = useMemo(
+    () => entries
+      .filter((e) => !e.analyzing && !e.error && e.metadata?.width && e.metadata?.height)
+      .map((e) => ({ id: e.id, original: e.file.name, name: makeName(e)!, screen: assignmentByContent.get(e.id)?.playlist.name })),
+    [entries, renameLabel, assignmentByContent]
+  );
+  const copyText = async (text: string, key: string) => {
+    try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
+    setCopiedKey(key);
+    setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1500);
+  };
 
   // --- Playlist düzenleme yardımcıları ---
   const updateRow = (id: string, patch: Partial<EditablePlaylist>) =>
@@ -416,6 +446,50 @@ export default function Atama() {
           <div className="flex items-center gap-2 text-sm text-primary bg-primary/5 border border-primary/20 rounded-lg px-4 py-2 w-fit">
             <Loader2 size={16} className="animate-spin" /> İçerikler analiz ediliyor...
           </div>
+        )}
+
+        {/* Dosya Adı Üretici */}
+        {renameRows.length > 0 && (
+          <Section title="Dosya Adı Üretici" subtitle="Yüklemeden, kopyala-yapıştır için hazır adlar" icon={Tag}>
+            <div className="flex flex-col sm:flex-row sm:items-end gap-3 mb-4">
+              <div className="flex-1">
+                <label className="block text-[11px] font-bold uppercase tracking-wide text-slate-400 mb-1.5">Marka / Kampanya</label>
+                <input
+                  value={renameLabel}
+                  onChange={(e) => setRenameLabel(e.target.value)}
+                  placeholder="Örn: TURKCELL KAMPANYA"
+                  className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none uppercase"
+                />
+                <p className="text-[11px] text-slate-400 mt-1">Her dosyanın başına bu gelir, sonuna otomatik <b>_GENİŞLİKxYÜKSEKLİK</b> eklenir.</p>
+              </div>
+              <button
+                onClick={() => copyText(renameRows.map((r) => r.name).join('\n'), '__all')}
+                className="flex items-center justify-center gap-1.5 text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg transition-colors"
+              >
+                {copiedKey === '__all' ? <Check size={15} /> : <Copy size={15} />}
+                {copiedKey === '__all' ? 'Kopyalandı' : 'Tümünü Kopyala'}
+              </button>
+            </div>
+            <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
+              {renameRows.map((r) => (
+                <div key={r.id} className="flex items-center gap-3 px-3 py-2.5 hover:bg-slate-50">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-mono text-sm font-semibold text-slate-800 truncate" title={r.name}>{r.name}</div>
+                    <div className="text-[11px] text-slate-400 truncate" title={r.original}>
+                      {r.original}{r.screen ? <span className="text-slate-500"> · {r.screen}</span> : <span className="text-rose-500"> · eşleşmedi</span>}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => copyText(r.name, r.id)}
+                    className={`flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-lg border transition-colors flex-shrink-0 ${copiedKey === r.id ? 'bg-emerald-50 text-emerald-700 border-emerald-200' : 'text-slate-600 border-slate-200 hover:bg-slate-100'}`}
+                  >
+                    {copiedKey === r.id ? <Check size={13} /> : <Copy size={13} />}
+                    {copiedKey === r.id ? 'Kopyalandı' : 'Kopyala'}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </Section>
         )}
 
         {/* Atama Planı */}
