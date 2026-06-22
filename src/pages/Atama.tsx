@@ -3,8 +3,9 @@ import {
   Upload as UploadIcon, Monitor, CheckCircle, AlertTriangle, X, Loader2,
   ArrowRight, FileVideo, Image as ImageIcon, ChevronDown, ChevronUp, Server, Inbox, Download, Layers,
   Settings2, Plus, Trash2, RotateCcw, FileDown, FileUp, FileText, Cloud, CloudUpload, Loader2 as Spinner,
-  Tag, Copy, Check,
+  Tag, Copy, Check, Archive,
 } from 'lucide-react';
+import { zipSync } from 'fflate';
 import { pdf } from '@react-pdf/renderer';
 import { analyzeMediaLocally } from '../utils/mediaInfo';
 import {
@@ -81,6 +82,7 @@ export default function Atama() {
   // Dosya adı üretici (toplu yeniden adlandırma yardımcısı)
   const [renameLabel, setRenameLabel] = useState('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
+  const [zipping, setZipping] = useState(false);
 
   useEffect(() => {
     try { localStorage.setItem(LS_KEY, JSON.stringify(editablePlaylists)); } catch { /* ignore */ }
@@ -201,6 +203,44 @@ export default function Atama() {
     try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
     setCopiedKey(key);
     setTimeout(() => setCopiedKey((k) => (k === key ? null : k)), 1500);
+  };
+
+  // Yüklenen dosyaları doğru adlarla yeniden adlandırıp ZIP olarak indir
+  const downloadZip = async () => {
+    setZipping(true);
+    try {
+      await new Promise((r) => setTimeout(r, 50)); // spinner boyansın
+      const files: Record<string, Uint8Array> = {};
+      const used = new Set<string>();
+      for (const e of entries) {
+        if (e.analyzing || e.error || !e.metadata?.width || !e.metadata?.height) continue;
+        let name = makeName(e)!;
+        if (used.has(name)) {
+          const dot = name.lastIndexOf('.');
+          const base = dot > 0 ? name.slice(0, dot) : name;
+          const ext = dot > 0 ? name.slice(dot) : '';
+          let k = 2;
+          while (used.has(`${base}_${k}${ext}`)) k++;
+          name = `${base}_${k}${ext}`;
+        }
+        used.add(name);
+        files[name] = new Uint8Array(await e.file.arrayBuffer());
+      }
+      if (!Object.keys(files).length) { setZipping(false); return; }
+      const zipped = zipSync(files, { level: 0 });
+      const blob = new Blob([zipped.slice()], { type: 'application/zip' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const brand = renameLabel.trim().toLocaleUpperCase('tr-TR').replace(/[^\p{L}\p{N}_-]+/gu, '_') || 'icerikler';
+      a.href = url; a.download = `${brand}_yeniden-adlandirildi.zip`;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error('ZIP hatası:', err);
+      alert('ZIP oluşturulurken bir hata oluştu (dosyalar çok büyük olabilir).');
+    } finally {
+      setZipping(false);
+    }
   };
 
   // --- Playlist düzenleme yardımcıları ---
@@ -597,13 +637,23 @@ export default function Atama() {
                 />
                 <p className="text-[11px] text-slate-400 mt-1">Her dosyanın başına bu gelir, sonuna otomatik <b>_GENİŞLİKxYÜKSEKLİK</b> eklenir.</p>
               </div>
-              <button
-                onClick={() => copyText(renameRows.map((r) => r.name).join('\n'), '__all')}
-                className="flex items-center justify-center gap-1.5 text-sm font-semibold bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg transition-colors"
-              >
-                {copiedKey === '__all' ? <Check size={15} /> : <Copy size={15} />}
-                {copiedKey === '__all' ? 'Kopyalandı' : 'Tümünü Kopyala'}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={downloadZip}
+                  disabled={zipping}
+                  className="flex items-center justify-center gap-1.5 text-sm font-semibold bg-primary hover:bg-primary/90 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors shadow-sm shadow-primary/20"
+                >
+                  {zipping ? <Spinner size={15} className="animate-spin" /> : <Archive size={15} />}
+                  {zipping ? 'Hazırlanıyor...' : 'Yeniden Adlandırıp İndir (ZIP)'}
+                </button>
+                <button
+                  onClick={() => copyText(renameRows.map((r) => r.name).join('\n'), '__all')}
+                  className="flex items-center justify-center gap-1.5 text-sm font-semibold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg transition-colors"
+                >
+                  {copiedKey === '__all' ? <Check size={15} /> : <Copy size={15} />}
+                  {copiedKey === '__all' ? 'Kopyalandı' : 'Adları Kopyala'}
+                </button>
+              </div>
             </div>
             <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
               {renameRows.map((r) => (
