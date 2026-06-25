@@ -3,7 +3,7 @@ import {
   Upload as UploadIcon, Monitor, CheckCircle, AlertTriangle, X, Loader2,
   ArrowRight, FileVideo, Image as ImageIcon, ChevronDown, ChevronUp, Server, Inbox, Download, Layers,
   Settings2, Plus, Trash2, RotateCcw, FileDown, FileUp, FileText, Cloud, CloudUpload, Loader2 as Spinner,
-  Tag, Copy, Check, Archive,
+  Tag, Copy, Check, Archive, Target,
 } from 'lucide-react';
 import { zipSync } from 'fflate';
 import { pdf } from '@react-pdf/renderer';
@@ -12,7 +12,7 @@ import {
   DEFAULT_PLAYLISTS, hydratePlaylist, CONTROLLERS_LIST,
   type EditablePlaylist, type Playlist,
 } from '../data/terminalKadikoy';
-import { buildAssignment, type Content } from '../utils/matching';
+import { buildAssignment, evaluateForPlaylist, type Content, type SingleEval } from '../utils/matching';
 import AtamaPDF from '../components/AtamaPDF';
 import OlcuFoyuPDF from '../components/OlcuFoyuPDF';
 
@@ -83,6 +83,8 @@ export default function Atama() {
   const [renameLabel, setRenameLabel] = useState('');
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [zipping, setZipping] = useState(false);
+  // Kontrol modu: 'auto' (tüm ekranlar, otomatik atama) veya bir playlist id'si (sadece o ekran)
+  const [targetMode, setTargetMode] = useState<'auto' | string>('auto');
 
   useEffect(() => {
     try { localStorage.setItem(LS_KEY, JSON.stringify(editablePlaylists)); } catch { /* ignore */ }
@@ -169,6 +171,21 @@ export default function Atama() {
 
   const result = useMemo(() => buildAssignment(contents, playlists, tolerance), [contents, playlists, tolerance]);
 
+  // Tek playlist (manuel) kontrol modu
+  const singlePlaylist = useMemo(
+    () => (targetMode === 'auto' ? null : playlists.find((p) => p.id === targetMode) || null),
+    [targetMode, playlists]
+  );
+  const singleEvals = useMemo<SingleEval[]>(
+    () => (singlePlaylist ? contents.map((c) => evaluateForPlaylist(c, singlePlaylist, tolerance)) : []),
+    [singlePlaylist, contents, tolerance]
+  );
+  const singleStats = useMemo(() => {
+    let tam = 0, riskli = 0, uymayan = 0;
+    singleEvals.forEach((s) => { if (s.assignable && s.resolutionExact) tam++; else if (s.assignable) riskli++; else uymayan++; });
+    return { tam, riskli, uymayan };
+  }, [singleEvals]);
+
   const playlistAssignment = useMemo(() => {
     const m = new Map<string, { content: Content; deviation: number; klass: string }>();
     result.assignments.forEach((a) => m.set(a.playlist.id, { content: a.content, deviation: a.deviation, klass: a.klass }));
@@ -193,11 +210,22 @@ export default function Atama() {
     const base = brand ? `${brand}_${m.width}x${m.height}` : `${m.width}x${m.height}`;
     return base + ext;
   };
+  const singleAssignableIds = useMemo(
+    () => new Set(singleEvals.filter((s) => s.assignable).map((s) => s.content.id)),
+    [singleEvals]
+  );
   const renameRows = useMemo(
     () => entries
       .filter((e) => !e.analyzing && !e.error && e.metadata?.width && e.metadata?.height)
-      .map((e) => ({ id: e.id, original: e.file.name, name: makeName(e)!, screen: assignmentByContent.get(e.id)?.playlist.name })),
-    [entries, renameLabel, assignmentByContent]
+      .map((e) => ({
+        id: e.id,
+        original: e.file.name,
+        name: makeName(e)!,
+        screen: singlePlaylist
+          ? (singleAssignableIds.has(e.id) ? singlePlaylist.name : undefined)
+          : assignmentByContent.get(e.id)?.playlist.name,
+      })),
+    [entries, renameLabel, assignmentByContent, singlePlaylist, singleAssignableIds]
   );
   const copyText = async (text: string, key: string) => {
     try { await navigator.clipboard.writeText(text); } catch { /* ignore */ }
@@ -462,8 +490,30 @@ export default function Atama() {
             onChange={(e) => { if (e.target.files?.length) handleFiles(Array.from(e.target.files)); e.target.value = ''; }} />
         </div>
 
-        {/* Özet sayaçlar */}
-        {entries.length > 0 && (
+        {/* Kontrol Modu */}
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-5 py-4 flex flex-col md:flex-row md:items-center gap-3">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700 flex-shrink-0">
+            <Target size={16} className="text-primary" /> Kontrol Modu
+          </div>
+          <select
+            value={targetMode}
+            onChange={(e) => setTargetMode(e.target.value)}
+            className="flex-1 px-3 py-2 rounded-lg border border-slate-200 text-sm bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none"
+          >
+            <option value="auto">Tüm ekranlar — otomatik en uygun atama</option>
+            {playlists.map((p) => (
+              <option key={p.id} value={p.id}>Sadece: {p.name} ({p.targetWidth}×{p.targetHeight})</option>
+            ))}
+          </select>
+          {singlePlaylist && (
+            <span className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1.5 flex-shrink-0">
+              Tüm içerikler yalnızca <b>{singlePlaylist.name}</b> için kontrol ediliyor.
+            </span>
+          )}
+        </div>
+
+        {/* Özet sayaçlar — otomatik mod */}
+        {entries.length > 0 && targetMode === 'auto' && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <SummaryCard icon={CheckCircle} color="emerald" label="Eşleşen İçerik" value={result.assignments.length} />
             <SummaryCard icon={AlertTriangle} color="rose" label="Uymayan İçerik" value={result.unmatchedContents.length} />
@@ -472,7 +522,16 @@ export default function Atama() {
           </div>
         )}
 
-        {hasResults && (
+        {/* Özet sayaçlar — tek playlist modu */}
+        {entries.length > 0 && singlePlaylist && (
+          <div className="grid grid-cols-3 gap-4">
+            <SummaryCard icon={CheckCircle} color="emerald" label="Tam Uyan" value={singleStats.tam} />
+            <SummaryCard icon={AlertTriangle} color="amber" label="Riskli (ölçek farklı)" value={singleStats.riskli} />
+            <SummaryCard icon={X} color="rose" label="Uymayan" value={singleStats.uymayan} />
+          </div>
+        )}
+
+        {targetMode === 'auto' && hasResults && (
           <div className="flex justify-end">
             <button onClick={handleDownloadPdf} disabled={generatingPdf || analyzing}
               className="flex items-center gap-2 bg-primary hover:bg-primary/90 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2.5 rounded-lg shadow-sm shadow-primary/20 transition-all">
@@ -488,8 +547,51 @@ export default function Atama() {
           </div>
         )}
 
+        {/* Tek playlist (manuel) kontrol sonuçları */}
+        {singlePlaylist && singleEvals.length > 0 && (
+          <Section title={`Sadece "${singlePlaylist.name}" için kontrol`} subtitle={`Hedef ${singlePlaylist.targetWidth}×${singlePlaylist.targetHeight} · ${singlePlaylist.controllers.map((c) => c.name).join(', ')}`} icon={Target}>
+            <div className="divide-y divide-slate-100">
+              {singleEvals.map((s) => {
+                const file = fileById(s.content.id);
+                const badge = !s.feasible
+                  ? { txt: 'CİHAZ ENGELİ', cls: 'bg-rose-100 text-rose-700 border-rose-200' }
+                  : s.resolutionExact
+                  ? { txt: '✓ TAM UYUM', cls: 'bg-emerald-100 text-emerald-700 border-emerald-200' }
+                  : s.assignable
+                  ? { txt: 'RİSKLİ · ÖLÇEK FARKLI', cls: 'bg-amber-100 text-amber-700 border-amber-200' }
+                  : { txt: `ORAN UYMUYOR${s.deviation !== null ? ` · %${s.deviation.toFixed(1)}` : ''}`, cls: 'bg-rose-100 text-rose-700 border-rose-200' };
+                return (
+                  <div key={s.content.id} className="py-3 px-1">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${file?.type.startsWith('image/') ? 'bg-emerald-50 text-emerald-500' : 'bg-indigo-50 text-indigo-500'}`}>
+                        {file?.type.startsWith('image/') ? <ImageIcon size={18} /> : <FileVideo size={18} />}
+                      </div>
+                      <RatioBox w={s.content.width} h={s.content.height} />
+                      <div className="min-w-0 flex-1">
+                        <div className="font-semibold text-slate-800 text-sm truncate" title={s.content.filename}>{s.content.filename}</div>
+                        <div className="text-xs text-slate-400">{s.content.width}×{s.content.height} · {ratioLabel(s.content.width, s.content.height)} · {s.content.codec_name || '-'}{s.deviation !== null ? ` · oran sapması %${s.deviation.toFixed(1)}` : ''}</div>
+                      </div>
+                      <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md border whitespace-nowrap ${badge.cls}`}>{badge.txt}</span>
+                    </div>
+                    {s.riskNote && (
+                      <div className="ml-12 mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1.5 flex items-start gap-1.5">
+                        <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" /> <span>{s.riskNote}</span>
+                      </div>
+                    )}
+                    {!s.feasible && s.blockReasons.length > 0 && (
+                      <ul className="ml-12 mt-2 text-[11px] text-rose-700 bg-rose-50 border border-rose-100 rounded-md px-2.5 py-1.5 list-disc list-inside">
+                        {s.blockReasons.map((r, i) => <li key={i}>{r}</li>)}
+                      </ul>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </Section>
+        )}
+
         {/* Atama Planı */}
-        {result.assignments.length > 0 && (
+        {targetMode === 'auto' && result.assignments.length > 0 && (
           <Section title="Atama Planı" subtitle="Her içerik için önerilen playlist" icon={ArrowRight}>
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mb-3 text-[11px] text-slate-500">
               <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-emerald-400"></span> Tam uyum (oran birebir)</span>
@@ -561,7 +663,7 @@ export default function Atama() {
         )}
 
         {/* Uymayan içerikler */}
-        {result.unmatchedContents.length > 0 && (
+        {targetMode === 'auto' && result.unmatchedContents.length > 0 && (
           <Section title="Atanamayan İçerikler" subtitle="Hiçbir playliste uymuyor" icon={AlertTriangle} tone="rose">
             <div className="space-y-2">
               {result.unmatchedContents.map((u) => (
@@ -580,7 +682,7 @@ export default function Atama() {
         )}
 
         {/* Boş playlistler */}
-        {entries.length > 0 && result.emptyPlaylists.length > 0 && (
+        {targetMode === 'auto' && entries.length > 0 && result.emptyPlaylists.length > 0 && (
           <Section title="İçerik Bekleyen Playlistler" subtitle="Bu playlistlere uygun içerik gelmedi" icon={Inbox} tone="amber">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {result.emptyPlaylists.map((p) => (
@@ -637,23 +739,14 @@ export default function Atama() {
                 />
                 <p className="text-[11px] text-slate-400 mt-1">Her dosyanın başına bu gelir, sonuna otomatik <b>_GENİŞLİKxYÜKSEKLİK</b> eklenir.</p>
               </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={downloadZip}
-                  disabled={zipping}
-                  className="flex items-center justify-center gap-1.5 text-sm font-semibold bg-primary hover:bg-primary/90 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors shadow-sm shadow-primary/20"
-                >
-                  {zipping ? <Spinner size={15} className="animate-spin" /> : <Archive size={15} />}
-                  {zipping ? 'Hazırlanıyor...' : 'Yeniden Adlandırıp İndir (ZIP)'}
-                </button>
-                <button
-                  onClick={() => copyText(renameRows.map((r) => r.name).join('\n'), '__all')}
-                  className="flex items-center justify-center gap-1.5 text-sm font-semibold bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg transition-colors"
-                >
-                  {copiedKey === '__all' ? <Check size={15} /> : <Copy size={15} />}
-                  {copiedKey === '__all' ? 'Kopyalandı' : 'Adları Kopyala'}
-                </button>
-              </div>
+              <button
+                onClick={downloadZip}
+                disabled={zipping}
+                className="flex items-center justify-center gap-1.5 text-sm font-semibold bg-primary hover:bg-primary/90 disabled:opacity-60 text-white px-4 py-2 rounded-lg transition-colors shadow-sm shadow-primary/20"
+              >
+                {zipping ? <Spinner size={15} className="animate-spin" /> : <Archive size={15} />}
+                {zipping ? 'Hazırlanıyor...' : 'Yeniden Adlandırıp İndir (ZIP)'}
+              </button>
             </div>
             <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
               {renameRows.map((r) => (

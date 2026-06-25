@@ -131,6 +131,24 @@ export function evaluatePlaylist(content: Content, pl: Playlist, tolerance: numb
   return { feasible, blockReasons, deviation: dev, klass, assignable };
 }
 
+// Birebir ölçü: 1-2 piksellik kodlama yuvarlamalarını (örn. 1224↔1225) tolere et.
+export function isResolutionExact(c: Content, pl: Playlist): boolean {
+  const near = (a?: number, b?: number) => a !== undefined && b !== undefined && Math.abs(a - b) <= Math.max(2, b * 0.005);
+  return near(c.width, pl.targetWidth) && near(c.height, pl.targetHeight);
+}
+export function riskNoteFor(c: Content, pl: Playlist): string {
+  return `Ekranın birebir ölçüsü ${pl.targetWidth}×${pl.targetHeight}. İçerik ${c.width}×${c.height} olarak gönderildiği için bu ölçü döndürülerek/ölçeklenerek oynatılır — birebir değil, riskli.`;
+}
+
+// Tek bir playlist için değerlendirme (manuel "sadece bu ekran" kontrolü)
+export type SingleEval = PairEval & { content: Content; playlist: Playlist; resolutionExact: boolean; riskNote?: string };
+export function evaluateForPlaylist(content: Content, pl: Playlist, tolerance: number): SingleEval {
+  const ev = evaluatePlaylist(content, pl, tolerance);
+  const resolutionExact = ev.assignable && isResolutionExact(content, pl);
+  const riskNote = ev.assignable && !resolutionExact ? riskNoteFor(content, pl) : undefined;
+  return { ...ev, content, playlist: pl, resolutionExact, riskNote };
+}
+
 // ---- Hungarian (Kuhn-Munkres), kare matris, min maliyet ----
 function hungarian(cost: number[][]): number[] {
   const n = cost.length;
@@ -257,12 +275,8 @@ export function buildAssignment(contents: Content[], playlists: Playlist[], tole
       const ev = evalMatrix.get(contents[i].id)!.get(playlists[j].id)!;
       const pl = playlists[j];
       const c = contents[i];
-      // Birebir ölçü: 1-2 piksellik kodlama yuvarlamalarını (örn. 1224↔1225) tolere et.
-      const near = (a?: number, b?: number) => a !== undefined && b !== undefined && Math.abs(a - b) <= Math.max(2, b * 0.005);
-      const resolutionExact = near(c.width, pl.targetWidth) && near(c.height, pl.targetHeight);
-      const riskNote = resolutionExact
-        ? undefined
-        : `Ekranın birebir ölçüsü ${pl.targetWidth}×${pl.targetHeight}. İçerik ${c.width}×${c.height} olarak gönderildiği için otomatik eşlendi; bu ölçü döndürülerek/ölçeklenerek oynatılır — birebir değil, riskli.`;
+      const resolutionExact = isResolutionExact(c, pl);
+      const riskNote = resolutionExact ? undefined : riskNoteFor(c, pl);
       result.assignments.push({ content: c, playlist: pl, deviation: ev.deviation!, klass: ev.klass, resolutionExact, riskNote });
       matchedPlaylistIds.add(pl.id);
     } else {
