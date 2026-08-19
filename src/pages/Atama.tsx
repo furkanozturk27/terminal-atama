@@ -33,7 +33,7 @@ function RatioBox({ w, h, tone = 'indigo' }: { w?: number; h?: number; tone?: 'i
 
 type FileEntry = { id: string; file: File; analyzing: boolean; metadata?: Content; error?: string };
 
-const LS_KEY = 'tk_playlists_v4';
+const LS_KEY = 'tk_playlists_v5';
 // Merkezi (bulut) ekran listesi API'si — web ve masaüstü aynı kaynağı kullanır.
 const CLOUD_API = 'https://terminal-atama.vercel.app/api/playlists';
 

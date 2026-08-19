@@ -74,5 +74,5 @@ export const DEFAULT_PLAYLISTS: EditablePlaylist[] = [
   { id: 'cezayir', name: 'CEZAYİR USTA / CAFER EROĞLU', targetWidth: 700, targetHeight: 1225, controllerNames: ['TB40', 'TB50'], screenCount: 2 },
   { id: 'rossman', name: 'ROSSMAN YANI', targetWidth: 504, targetHeight: 840, controllerNames: ['T1-4G'], screenCount: 1 },
   { id: 'paribu-duvar', name: 'PARİBU ART DUVAR YANI', targetWidth: 336, targetHeight: 672, controllerNames: ['T1-4G'], screenCount: 1 },
-  { id: 'raketler', name: 'RAKETLER', targetWidth: 336, targetHeight: 588, controllerNames: ['TB1-4G'], screenCount: 7 },
+  { id: 'raketler', name: 'RAKETLER', targetWidth: 336, targetHeight: 588, controllerNames: ['T1-4G'], screenCount: 7 },
 ];
