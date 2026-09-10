@@ -24,23 +24,25 @@ const L = (w: number, h: number, f?: number, b?: number): CodecLimit => ({
 
 // Tüm kontrol cihazları (dump.sql -> controller_devices)
 export const CONTROLLERS_LIST: Controller[] = [
-  { name: 'TU15 PRO', codec_limits: { JPEG: L(4096, 2304, 60, 100), 'H.265/HEVC': L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 80) } },
-  { name: 'TU20 PRO', codec_limits: { JPEG: L(4096, 2304, 60, 100), 'H.265/HEVC': L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 80) } },
-  { name: 'TU4K PRO', codec_limits: { JPEG: L(8000, 8000, 60, 100), 'H.265/HEVC': L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 100) } },
-  { name: 'TU40 PRO', codec_limits: { JPEG: L(8000, 8000, 60, 100), 'H.265/HEVC': L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 100) } },
-  { name: 'T10 PLUS', codec_limits: { JPEG: L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 60), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
-  { name: 'T20 PLUS', codec_limits: { JPEG: L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 60), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
-  { name: 'TB30', codec_limits: { JPEG: L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 80), 'H.265/HEVC': L(8000, 8000, 60, 100) } },
-  { name: 'TB40', codec_limits: { JPEG: L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 80), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
-  { name: 'TB50', codec_limits: { JPEG: L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 80), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
-  { name: 'TB60', codec_limits: { JPEG: L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 80), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
-  { name: 'TCC160', codec_limits: { JPEG: L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 80), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
-  { name: 'LCB2K', codec_limits: { JPEG: L(4096, 2304, 60, 100), 'H.264': L(3840, 2160, 30, 100), 'H.265/HEVC': L(3840, 2160, 60, 100) } },
-  { name: 'LCB4K', codec_limits: { JPEG: L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 80), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
-  { name: 'TB1-4G', codec_limits: { JPEG: L(4096, 2160), 'H.264': L(1920, 1088, 30, 57), 'H.265': L(1920, 1088, 60, 57) } },
+  // TU serisi (Taurus Ultra): WebP görsel + WebM (VP8/VP9) video destekler (resmi spec).
+  { name: 'TU15 PRO', codec_limits: { JPEG: L(4096, 2304, 60, 100), WEBP: L(4096, 2304), 'H.265/HEVC': L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 80), VP9: L(4096, 2304, 60, 100), VP8: L(4096, 2304, 30, 80) } },
+  { name: 'TU20 PRO', codec_limits: { JPEG: L(4096, 2304, 60, 100), WEBP: L(4096, 2304), 'H.265/HEVC': L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 80), VP9: L(4096, 2304, 60, 100), VP8: L(4096, 2304, 30, 80) } },
+  { name: 'TU4K PRO', codec_limits: { JPEG: L(8000, 8000, 60, 100), WEBP: L(8000, 8000), 'H.265/HEVC': L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 100), VP9: L(4096, 2304, 60, 100), VP8: L(4096, 2304, 30, 80) } },
+  { name: 'TU40 PRO', codec_limits: { JPEG: L(8000, 8000, 60, 100), WEBP: L(8000, 8000), 'H.265/HEVC': L(4096, 2304, 60, 100), 'H.264': L(4096, 2304, 30, 100), VP9: L(4096, 2304, 60, 100), VP8: L(4096, 2304, 30, 80) } },
+  // TB serisi ve diğerleri: WebP görsel destekler; WebM/VP8/VP9 YOK (resmi spec).
+  { name: 'T10 PLUS', codec_limits: { JPEG: L(4096, 2304, 60, 100), WEBP: L(4096, 2160), 'H.264': L(4096, 2304, 30, 60), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
+  { name: 'T20 PLUS', codec_limits: { JPEG: L(4096, 2304, 60, 100), WEBP: L(4096, 2160), 'H.264': L(4096, 2304, 30, 60), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
+  { name: 'TB30', codec_limits: { JPEG: L(4096, 2304, 60, 100), WEBP: L(4096, 2160), 'H.264': L(4096, 2304, 30, 80), 'H.265/HEVC': L(8000, 8000, 60, 100) } },
+  { name: 'TB40', codec_limits: { JPEG: L(4096, 2304, 60, 100), WEBP: L(4096, 2160), 'H.264': L(4096, 2304, 30, 80), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
+  { name: 'TB50', codec_limits: { JPEG: L(4096, 2304, 60, 100), WEBP: L(4096, 2160), 'H.264': L(4096, 2304, 30, 80), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
+  { name: 'TB60', codec_limits: { JPEG: L(4096, 2304, 60, 100), WEBP: L(4096, 2160), 'H.264': L(4096, 2304, 30, 80), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
+  { name: 'TCC160', codec_limits: { JPEG: L(4096, 2304, 60, 100), WEBP: L(4096, 2160), 'H.264': L(4096, 2304, 30, 80), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
+  { name: 'LCB2K', codec_limits: { JPEG: L(4096, 2304, 60, 100), WEBP: L(4096, 2160), 'H.264': L(3840, 2160, 30, 100), 'H.265/HEVC': L(3840, 2160, 60, 100) } },
+  { name: 'LCB4K', codec_limits: { JPEG: L(4096, 2304, 60, 100), WEBP: L(4096, 2160), 'H.264': L(4096, 2304, 30, 80), 'H.265/HEVC': L(4096, 2304, 60, 100) } },
+  { name: 'TB1-4G', codec_limits: { JPEG: L(4096, 2160), WEBP: L(4096, 2160), 'H.264': L(1920, 1088, 30, 57), 'H.265': L(1920, 1088, 60, 57) } },
   // T1-4G: 1080p sınıfı Taurus oynatıcı (TB1-4G ile aynı decode limiti). Dikey içerik
   // yön-duyarlı kontrolle 1920×1088 zarfına sığarsa oynatılabilir.
-  { name: 'T1-4G', codec_limits: { JPEG: L(4096, 2160), 'H.264': L(1920, 1088, 30, 57), 'H.265': L(1920, 1088, 60, 57) } },
+  { name: 'T1-4G', codec_limits: { JPEG: L(4096, 2160), WEBP: L(4096, 2160), 'H.264': L(1920, 1088, 30, 57), 'H.265': L(1920, 1088, 60, 57) } },
 ];
 
 export const CONTROLLERS_BY_NAME: Record<string, Controller> = Object.fromEntries(
