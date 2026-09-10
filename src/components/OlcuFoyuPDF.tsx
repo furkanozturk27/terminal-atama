@@ -12,7 +12,7 @@ Font.register({
 });
 Font.registerHyphenationCallback((word) => [word]);
 
-const C = { ink: '#0f172a', body: '#334155', muted: '#64748b', faint: '#94a3b8', hair: '#e5e7eb', accent: '#6d28d9', tile: '#f8fafc' };
+const C = { ink: '#0f172a', body: '#334155', muted: '#64748b', faint: '#94a3b8', hair: '#e5e7eb', accent: '#6d28d9', tile: '#f8fafc', webm: '#059669', webmBg: '#ecfdf5', webmBd: '#a7f3d0' };
 
 const s = StyleSheet.create({
   page: { paddingTop: 42, paddingBottom: 54, paddingHorizontal: 44, fontFamily: 'Inter', color: C.body, fontSize: 9 },
@@ -27,17 +27,25 @@ const s = StyleSheet.create({
   th: { fontSize: 7, fontWeight: 600, color: C.muted, letterSpacing: 0.6, textTransform: 'uppercase' },
   row: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingVertical: 11, paddingHorizontal: 10, alignItems: 'center' },
 
-  cEkran: { width: '36%', paddingRight: 8 },
-  cOlcu: { width: '20%' },
-  cOran: { width: '12%' },
-  cYon: { width: '12%' },
+  cEkran: { width: '34%', paddingRight: 8 },
+  cOlcu: { width: '18%' },
+  cOran: { width: '10%' },
+  cYon: { width: '10%' },
   cAdet: { width: '8%' },
-  cCihaz: { width: '12%' },
+  cCihaz: { width: '20%' },
 
   ekran: { fontSize: 9.5, fontWeight: 600, color: C.ink },
   olcu: { fontSize: 11, fontWeight: 700, color: C.accent },
   olcuSub: { fontSize: 7, color: C.faint, marginTop: 1 },
   cell: { fontSize: 9, color: C.body },
+  webmTag: { fontSize: 6.5, fontWeight: 700, color: C.webm, marginTop: 3, letterSpacing: 0.3 },
+
+  fmtBox: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, backgroundColor: C.tile, borderWidth: 1, borderColor: C.hair, borderRadius: 8, padding: 11, marginBottom: 16 },
+  fmtItem: { flexDirection: 'row', alignItems: 'center', gap: 5, marginRight: 14 },
+  fmtLabel: { fontSize: 7, fontWeight: 700, color: C.faint, letterSpacing: 0.5, textTransform: 'uppercase' },
+  fmtVal: { fontSize: 9, fontWeight: 600, color: C.ink },
+  fmtNote: { fontSize: 8, color: C.muted, width: '100%', marginTop: 2 },
+  fmtDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: C.webm },
   footer: { position: 'absolute', bottom: 26, left: 44, right: 44, flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: C.hair, paddingTop: 8 },
   footTxt: { fontSize: 7.5, color: C.faint },
 });
@@ -52,6 +60,8 @@ type Props = { playlists: Playlist[]; locationName?: string };
 
 const OlcuFoyuPDF: React.FC<Props> = ({ playlists, locationName = 'Terminal Kadıköy' }) => {
   const now = new Date().toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
+  const hasWebm = (p: Playlist) => p.controllers.length > 0 && p.controllers.every((c) => 'VP9' in c.codec_limits || 'VP8' in c.codec_limits);
+  const webmScreens = playlists.filter(hasWebm).map((p) => p.name);
   return (
     <Document title={`${locationName} — Ekran Ölçü Föyü`}>
       <Page size="A4" style={s.page}>
@@ -65,6 +75,15 @@ const OlcuFoyuPDF: React.FC<Props> = ({ playlists, locationName = 'Terminal Kad�
           döndürülerek/ölçeklenerek gösterilir; bu durum görüntü kalitesi açısından risklidir. İkiz ekranlar tek ölçüde tek içerik alır.
         </Text>
         <View style={s.rule} />
+
+        <View style={s.fmtBox}>
+          <View style={s.fmtItem}><Text style={s.fmtLabel}>Video</Text><Text style={s.fmtVal}>MP4 · H.264 / H.265</Text></View>
+          <View style={s.fmtItem}><Text style={s.fmtLabel}>Görsel</Text><Text style={s.fmtVal}>JPEG · WebP</Text></View>
+          <View style={s.fmtItem}><View style={s.fmtDot} /><Text style={s.fmtVal}>WebM</Text></View>
+          <Text style={s.fmtNote}>
+            Video (MP4) ve görsel (JPEG, WebP) formatları tüm ekranlarda geçerlidir. WebM yalnızca “+ WebM” işaretli ekranlarda oynatılır{webmScreens.length ? ` — ${webmScreens.join(', ')}` : ''}; diğer ekranlar için videoyu MP4 (H.264/H.265) olarak gönderin.
+          </Text>
+        </View>
 
         <View style={s.thead}>
           <Text style={[s.th, s.cEkran]}>Ekran / Playlist</Text>
@@ -84,7 +103,10 @@ const OlcuFoyuPDF: React.FC<Props> = ({ playlists, locationName = 'Terminal Kad�
               <Text style={[s.cell, s.cOran]}>{ratioLabel(p.targetWidth, p.targetHeight)}</Text>
               <Text style={[s.cell, s.cYon]}>{portrait ? 'Dikey' : 'Yatay'}</Text>
               <Text style={[s.cell, s.cAdet]}>{p.screenCount}</Text>
-              <Text style={[s.cell, s.cCihaz]}>{p.controllers.map((c) => c.name).join(', ') || '-'}</Text>
+              <View style={s.cCihaz}>
+                <Text style={s.cell}>{p.controllers.map((c) => c.name).join(', ') || '-'}</Text>
+                {hasWebm(p) && <Text style={s.webmTag}>+ WebM</Text>}
+              </View>
             </View>
           );
         })}
