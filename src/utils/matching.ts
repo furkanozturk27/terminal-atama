@@ -140,6 +140,19 @@ export function riskNoteFor(c: Content, pl: Playlist): string {
   return `Ekranın birebir ölçüsü ${pl.targetWidth}×${pl.targetHeight}. İçerik ${c.width}×${c.height} olarak gönderildiği için bu ölçü döndürülerek/ölçeklenerek oynatılır — birebir değil, riskli.`;
 }
 
+// Playlistteki tüm cihazların ortak (en kısıtlı) H.264 limiti — otomatik düzeltme hedefi
+export function h264Cap(pl: Playlist): { maxFps: number; maxBitrateMbps: number } {
+  let fps = Infinity, br = Infinity;
+  for (const c of pl.controllers) {
+    const key = Object.keys(c.codec_limits).find((k) => k.toLowerCase().includes('264'));
+    if (!key) continue;
+    const lim = c.codec_limits[key];
+    if (lim.max_fps != null) fps = Math.min(fps, lim.max_fps);
+    if (lim.max_bitrate_mbps != null) br = Math.min(br, lim.max_bitrate_mbps);
+  }
+  return { maxFps: isFinite(fps) ? fps : 30, maxBitrateMbps: isFinite(br) ? br : 80 };
+}
+
 // Tek bir playlist için değerlendirme (manuel "sadece bu ekran" kontrolü)
 export type SingleEval = PairEval & { content: Content; playlist: Playlist; resolutionExact: boolean; riskNote?: string };
 export function evaluateForPlaylist(content: Content, pl: Playlist, tolerance: number): SingleEval {

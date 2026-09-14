@@ -12,9 +12,10 @@ import {
   DEFAULT_PLAYLISTS, hydratePlaylist, CONTROLLERS_LIST,
   type EditablePlaylist, type Playlist,
 } from '../data/terminalKadikoy';
-import { buildAssignment, evaluateForPlaylist, parseFps, type Content, type SingleEval } from '../utils/matching';
+import { buildAssignment, evaluateForPlaylist, parseFps, h264Cap, type Content, type SingleEval } from '../utils/matching';
 import AtamaPDF from '../components/AtamaPDF';
 import OlcuFoyuPDF from '../components/OlcuFoyuPDF';
+import VideoFixButton from '../components/VideoFixButton';
 
 // İçerik/ekran oranını küçük bir kutu olarak çizer (dikey/yatay görsel teyit)
 function RatioBox({ w, h, tone = 'indigo' }: { w?: number; h?: number; tone?: 'indigo' | 'emerald' }) {
@@ -59,6 +60,34 @@ function ratioLabel(w?: number, h?: number): string {
 function playlistMeta(pl: Playlist): string {
   const ctrls = pl.controllers.map((c) => c.name).join(', ') || 'cihaz tanımsız';
   return `${pl.targetWidth}×${pl.targetHeight} · ${ratioLabel(pl.targetWidth, pl.targetHeight)} · ${pl.screenCount} ekran · ${ctrls}`;
+}
+
+// --- Otomatik video düzeltme (ffmpeg.wasm) yardımcıları ---
+function isVideoFile(file?: File): boolean {
+  if (!file) return false;
+  return file.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm|m4v|ts)$/i.test(file.name);
+}
+// Çözünürlük engeli varsa transcoding (ölçek değiştirmeden) çözmez → düzeltme sunma.
+function hasResolutionBlock(blockReasons: string[]): boolean {
+  return blockReasons.some((r) => r.toLocaleLowerCase('tr-TR').includes('çözünürlük'));
+}
+// FPS/bitrate/codec engeli varsa (çözünürlük değil) düzeltilebilir kabul et.
+function isFixableByTranscode(file: File | undefined, blockReasons: string[]): boolean {
+  return isVideoFile(file) && blockReasons.length > 0 && !hasResolutionBlock(blockReasons);
+}
+function fixParamsFor(content: Content, pl: Playlist) {
+  const cap = h264Cap(pl);
+  const curFps = parseFps(content.avg_frame_rate);
+  return {
+    curFps: curFps ?? undefined,
+    curBitrateMbps: content.bit_rate ? content.bit_rate / 1_000_000 : undefined,
+    maxFps: cap.maxFps,
+    maxBitrateMbps: cap.maxBitrateMbps,
+  };
+}
+function fixDownloadName(content: Content): string {
+  const base = content.filename.replace(/\.[a-z0-9]+$/i, '') || 'video';
+  return `${base}_duzeltildi.mp4`;
 }
 
 export default function Atama() {
@@ -583,6 +612,19 @@ export default function Atama() {
                         {s.blockReasons.map((r, i) => <li key={i}>{r}</li>)}
                       </ul>
                     )}
+                    {(() => {
+                      const file = fileById(s.content.id);
+                      if (s.feasible || !file || !isFixableByTranscode(file, s.blockReasons)) return null;
+                      return (
+                        <div className="ml-12">
+                          <VideoFixButton
+                            file={file}
+                            params={fixParamsFor(s.content, s.playlist)}
+                            downloadName={fixDownloadName(s.content)}
+                          />
+                        </div>
+                      );
+                    })()}
                   </div>
                 );
               })}
@@ -682,6 +724,17 @@ export default function Atama() {
                         {u.blockReasons.map((r, i) => <li key={i}>{r}</li>)}
                       </ul>
                     )}
+                    {(() => {
+                      const file = fileById(u.content.id);
+                      if (u.kind !== 'DEVICE' || !u.bestPlaylist || !file || !isFixableByTranscode(file, u.blockReasons)) return null;
+                      return (
+                        <VideoFixButton
+                          file={file}
+                          params={fixParamsFor(u.content, u.bestPlaylist)}
+                          downloadName={fixDownloadName(u.content)}
+                        />
+                      );
+                    })()}
                   </div>
                   <button onClick={() => removeEntry(u.content.id)} className="text-slate-300 hover:text-rose-500"><X size={16} /></button>
                 </div>

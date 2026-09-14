@@ -13,6 +13,9 @@
     "dist": "npm run build && electron-builder --win portable"
   },
   "dependencies": {
+    "@ffmpeg/core": "^0.12.10",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
     "@react-pdf/renderer": "^4.5.1",
     "@upstash/redis": "^1.38.0",
     "fflate": "^0.8.3",
