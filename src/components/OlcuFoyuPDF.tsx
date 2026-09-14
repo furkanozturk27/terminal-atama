@@ -27,18 +27,21 @@ const s = StyleSheet.create({
   th: { fontSize: 7, fontWeight: 600, color: C.muted, letterSpacing: 0.6, textTransform: 'uppercase' },
   row: { flexDirection: 'row', borderBottomWidth: 1, borderBottomColor: '#f1f5f9', paddingVertical: 11, paddingHorizontal: 10, alignItems: 'center' },
 
-  cEkran: { width: '34%', paddingRight: 8 },
-  cOlcu: { width: '18%' },
-  cOran: { width: '10%' },
-  cYon: { width: '10%' },
-  cAdet: { width: '8%' },
-  cCihaz: { width: '20%' },
+  cEkran: { width: '30%', paddingRight: 8 },
+  cOlcu: { width: '17%' },
+  cYon: { width: '8%' },
+  cAdet: { width: '6%' },
+  cCihaz: { width: '15%' },
+  cLimit: { width: '24%' },
 
   ekran: { fontSize: 9.5, fontWeight: 600, color: C.ink },
   olcu: { fontSize: 11, fontWeight: 700, color: C.accent },
   olcuSub: { fontSize: 7, color: C.faint, marginTop: 1 },
   cell: { fontSize: 9, color: C.body },
   webmTag: { fontSize: 6.5, fontWeight: 700, color: C.webm, marginTop: 3, letterSpacing: 0.3 },
+  limRow: { flexDirection: 'row', alignItems: 'baseline', gap: 4, marginBottom: 1 },
+  limCodec: { fontSize: 7, fontWeight: 700, color: C.muted, width: 30 },
+  limVal: { fontSize: 8, color: C.ink },
 
   fmtBox: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, backgroundColor: C.tile, borderWidth: 1, borderColor: C.hair, borderRadius: 8, padding: 11, marginBottom: 16 },
   fmtItem: { flexDirection: 'row', alignItems: 'center', gap: 5, marginRight: 14 },
@@ -62,6 +65,24 @@ const OlcuFoyuPDF: React.FC<Props> = ({ playlists, locationName = 'Terminal Kad�
   const now = new Date().toLocaleDateString('tr-TR', { year: 'numeric', month: 'long', day: 'numeric' });
   const hasWebm = (p: Playlist) => p.controllers.length > 0 && p.controllers.every((c) => 'VP9' in c.codec_limits || 'VP8' in c.codec_limits);
   const webmScreens = playlists.filter(hasWebm).map((p) => p.name);
+  // Playlistteki tüm cihazların ortak (en kısıtlı) FPS/bitrate limiti — bir codec için
+  const cap = (p: Playlist, family: 'H.264' | 'H.265'): { fps: number | null; br: number | null } | null => {
+    if (!p.controllers.length) return null;
+    let fps = Infinity, br = Infinity;
+    for (const c of p.controllers) {
+      const key = Object.keys(c.codec_limits).find((k) => {
+        const kl = k.toLowerCase();
+        return family === 'H.264' ? kl.includes('264') : kl.includes('265') || kl.includes('hevc');
+      });
+      if (!key) return null;
+      const lim = c.codec_limits[key];
+      if (lim.max_fps != null) fps = Math.min(fps, lim.max_fps);
+      if (lim.max_bitrate_mbps != null) br = Math.min(br, lim.max_bitrate_mbps);
+    }
+    return { fps: isFinite(fps) ? fps : null, br: isFinite(br) ? br : null };
+  };
+  const capText = (c: { fps: number | null; br: number | null } | null) =>
+    c ? [c.fps != null ? `${c.fps} fps` : null, c.br != null ? `${c.br} Mbps` : null].filter(Boolean).join(' · ') : '-';
   return (
     <Document title={`${locationName} — Ekran Ölçü Föyü`}>
       <Page size="A4" style={s.page}>
@@ -81,17 +102,17 @@ const OlcuFoyuPDF: React.FC<Props> = ({ playlists, locationName = 'Terminal Kad�
           <View style={s.fmtItem}><Text style={s.fmtLabel}>Görsel</Text><Text style={s.fmtVal}>JPEG · WebP</Text></View>
           <View style={s.fmtItem}><View style={s.fmtDot} /><Text style={s.fmtVal}>WebM</Text></View>
           <Text style={s.fmtNote}>
-            Video (MP4) ve görsel (JPEG, WebP) formatları tüm ekranlarda geçerlidir. WebM yalnızca “+ WebM” işaretli ekranlarda oynatılır{webmScreens.length ? ` — ${webmScreens.join(', ')}` : ''}; diğer ekranlar için videoyu MP4 (H.264/H.265) olarak gönderin.
+            Video (MP4) ve görsel (JPEG, WebP) tüm ekranlarda geçerlidir. WebM yalnızca “+ WebM” işaretli ekranlarda{webmScreens.length ? ` (${webmScreens.join(', ')})` : ''} oynatılır. Aşağıdaki “Video Limiti” sütunu her ekranın maksimum FPS ve bitrate sınırını gösterir; bu sınırlar aşılırsa içerik oynatılmaz.
           </Text>
         </View>
 
         <View style={s.thead}>
           <Text style={[s.th, s.cEkran]}>Ekran / Playlist</Text>
           <Text style={[s.th, s.cOlcu]}>Doğru Ölçü</Text>
-          <Text style={[s.th, s.cOran]}>Oran</Text>
           <Text style={[s.th, s.cYon]}>Yön</Text>
           <Text style={[s.th, s.cAdet]}>Adet</Text>
           <Text style={[s.th, s.cCihaz]}>Cihaz</Text>
+          <Text style={[s.th, s.cLimit]}>Video Limiti (maks)</Text>
         </View>
 
         {playlists.map((p, i) => {
@@ -99,13 +120,16 @@ const OlcuFoyuPDF: React.FC<Props> = ({ playlists, locationName = 'Terminal Kad�
           return (
             <View key={i} style={s.row} wrap={false}>
               <View style={s.cEkran}><Text style={s.ekran}>{p.name}</Text></View>
-              <View style={s.cOlcu}><Text style={s.olcu}>{p.targetWidth} × {p.targetHeight}</Text><Text style={s.olcuSub}>piksel</Text></View>
-              <Text style={[s.cell, s.cOran]}>{ratioLabel(p.targetWidth, p.targetHeight)}</Text>
+              <View style={s.cOlcu}><Text style={s.olcu}>{p.targetWidth} × {p.targetHeight}</Text><Text style={s.olcuSub}>{ratioLabel(p.targetWidth, p.targetHeight)} · piksel</Text></View>
               <Text style={[s.cell, s.cYon]}>{portrait ? 'Dikey' : 'Yatay'}</Text>
               <Text style={[s.cell, s.cAdet]}>{p.screenCount}</Text>
               <View style={s.cCihaz}>
                 <Text style={s.cell}>{p.controllers.map((c) => c.name).join(', ') || '-'}</Text>
                 {hasWebm(p) && <Text style={s.webmTag}>+ WebM</Text>}
+              </View>
+              <View style={s.cLimit}>
+                <View style={s.limRow}><Text style={s.limCodec}>H.264</Text><Text style={s.limVal}>{capText(cap(p, 'H.264'))}</Text></View>
+                <View style={s.limRow}><Text style={s.limCodec}>H.265</Text><Text style={s.limVal}>{capText(cap(p, 'H.265'))}</Text></View>
               </View>
             </View>
           );
