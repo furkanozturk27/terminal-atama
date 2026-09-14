@@ -1,6 +1,6 @@
 import React from 'react';
 import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/renderer';
-import type { MatchResult, Assignment } from '../utils/matching';
+import { parseFps, type MatchResult, type Assignment } from '../utils/matching';
 
 Font.register({
   family: 'Inter',
@@ -226,7 +226,7 @@ const AtamaPDF: React.FC<Props> = ({ result, tolerance, locationName = 'Terminal
               const bp = u.bestPlaylist;
               let action = '';
               if (u.kind === 'INVALID') action = 'Lütfen geçerli bir video/görsel dosyası olarak yeniden gönderin.';
-              else if (u.kind === 'DEVICE' && bp) action = `Lütfen ${bp.name} için uygun formatta hazırlayın (öneri: H.264/H.265, ${dims(bp.targetWidth, bp.targetHeight)}).`;
+              else if (u.kind === 'DEVICE' && bp) action = `Dosyayı ${bp.name} cihaz sınırlarına göre yeniden dışa aktarın (aşağıdaki codec / FPS / bitrate / çözünürlük sebeplerine göre).`;
               else if (u.kind === 'CONTENTION' && bp) action = `Uygun ekran (${bp.name}, ${dims(bp.targetWidth, bp.targetHeight)}) başka bir içeriğe atandı; bu orana uygun ek içerik gönderebilirsiniz.`;
               else if (bp) action = `Lütfen ${bp.name} (${dims(bp.targetWidth, bp.targetHeight)} · ${ratioLabel(bp.targetWidth, bp.targetHeight)}) oranına göre revize edin.`;
               else action = 'Lütfen ekran oranlarından birine göre revize edin.';
@@ -234,9 +234,16 @@ const AtamaPDF: React.FC<Props> = ({ result, tolerance, locationName = 'Terminal
                 <View key={i} style={s.flagRow} wrap={false}>
                   <View style={s.flagTop}>
                     <Text style={[s.name, { width: '70%' }]}>{breakable(u.content.filename)}</Text>
-                    <Text style={[s.meta, { marginTop: 0, textAlign: 'right' }]}>{dims(u.content.width, u.content.height)}  ·  {ratioLabel(u.content.width, u.content.height)}  ·  {u.content.codec_name || '-'}</Text>
+                    <Text style={[s.meta, { marginTop: 0, textAlign: 'right' }]}>
+                      {dims(u.content.width, u.content.height)}  ·  {ratioLabel(u.content.width, u.content.height)}  ·  {u.content.codec_name || '-'}
+                      {(() => { const f = parseFps(u.content.avg_frame_rate); return f ? `  ·  ${Math.round(f)} fps` : ''; })()}
+                      {u.content.bit_rate ? `  ·  ${(u.content.bit_rate / 1_000_000).toFixed(1)} Mbps` : ''}
+                    </Text>
                   </View>
                   <Text style={s.reason}>{u.reason}</Text>
+                  {u.blockReasons.map((r, k) => (
+                    <Text key={k} style={[s.reason, { color: C.rose, marginTop: 2 }]}>•  {r}</Text>
+                  ))}
                   <Text style={[s.action, { color: C.rose }]}>Öneri — {action}</Text>
                 </View>
               );

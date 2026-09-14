@@ -12,7 +12,7 @@ import {
   DEFAULT_PLAYLISTS, hydratePlaylist, CONTROLLERS_LIST,
   type EditablePlaylist, type Playlist,
 } from '../data/terminalKadikoy';
-import { buildAssignment, evaluateForPlaylist, type Content, type SingleEval } from '../utils/matching';
+import { buildAssignment, evaluateForPlaylist, parseFps, type Content, type SingleEval } from '../utils/matching';
 import AtamaPDF from '../components/AtamaPDF';
 import OlcuFoyuPDF from '../components/OlcuFoyuPDF';
 
@@ -671,8 +671,17 @@ export default function Atama() {
                   <AlertTriangle size={18} className="text-rose-500 flex-shrink-0 mt-0.5" />
                   <div className="min-w-0 flex-1">
                     <div className="font-semibold text-slate-800 text-sm">{u.content.filename}</div>
-                    <div className="text-xs text-slate-500 mb-1">{u.content.width}×{u.content.height} · {ratioLabel(u.content.width, u.content.height)} · {u.content.codec_name || '-'}</div>
+                    <div className="text-xs text-slate-500 mb-1">
+                      {u.content.width}×{u.content.height} · {ratioLabel(u.content.width, u.content.height)} · {u.content.codec_name || '-'}
+                      {(() => { const f = parseFps(u.content.avg_frame_rate); return f ? ` · ${Math.round(f)} fps` : ''; })()}
+                      {u.content.bit_rate ? ` · ${(u.content.bit_rate / 1_000_000).toFixed(1)} Mbps` : ''}
+                    </div>
                     <div className="text-xs text-rose-700">{u.reason}</div>
+                    {u.blockReasons.length > 0 && (
+                      <ul className="mt-1.5 text-[11px] text-rose-700 bg-white/70 border border-rose-100 rounded-md px-2.5 py-1.5 list-disc list-inside space-y-0.5">
+                        {u.blockReasons.map((r, i) => <li key={i}>{r}</li>)}
+                      </ul>
+                    )}
                   </div>
                   <button onClick={() => removeEntry(u.content.id)} className="text-slate-300 hover:text-rose-500"><X size={16} /></button>
                 </div>

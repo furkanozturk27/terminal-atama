@@ -204,6 +204,7 @@ export type UnmatchedContent = {
   bestDeviation?: number;
   kind: UnmatchKind;
   reason: string;
+  blockReasons: string[]; // DEVICE için birebir engel nedenleri (FPS/çözünürlük/bitrate/codec)
 };
 
 export type MatchResult = {
@@ -323,7 +324,7 @@ export function buildAssignment(contents: Content[], playlists: Playlist[], tole
         kind = 'DEVICE';
         suggestion = bAny;
         reason = suggestion
-          ? `Oran uyan ekranın cihazı bu dosyayı oynatamıyor (codec/çözünürlük/bitrate). Oran uyan ekran: ${suggestion.pl.name} (hedef ${suggestion.pl.targetWidth}×${suggestion.pl.targetHeight}). İçeriği bu ölçüye göre küçültün.`
+          ? `Oran uyan ekran: ${suggestion.pl.name} (${suggestion.pl.controllers.map((c) => c.name).join(', ') || 'cihaz'}) — cihaz bu dosyayı olduğu gibi oynatamıyor. Kesin nedenler:`
           : 'Oran uyan ekranın cihazı bu dosyayı oynatamıyor.';
       } else {
         kind = 'NO_FIT';
@@ -338,6 +339,7 @@ export function buildAssignment(contents: Content[], playlists: Playlist[], tole
         bestDeviation: suggestion?.ev.deviation ?? undefined,
         kind,
         reason,
+        blockReasons: kind === 'DEVICE' ? (suggestion?.ev.blockReasons ?? []) : [],
       });
     }
   }
