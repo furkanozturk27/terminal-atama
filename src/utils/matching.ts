@@ -5,6 +5,8 @@
 // - Optimal birebir atama: Hungarian (min toplam sapma, birebir uyum önceliği)
 
 import type { Controller, Playlist, CodecLimit } from '../data/terminalKadikoy';
+import { blockingIssues } from './contentIssues';
+import type { Bars } from './blackBars';
 
 export type Content = {
   id: string;
@@ -16,6 +18,23 @@ export type Content = {
   bit_rate?: number;
   duration?: number;
   file_type?: string;
+  size_bytes?: number;
+  // Gizli risk alanları (mediaInfo.ts)
+  bit_depth?: number;
+  chroma?: string;
+  profile?: string;
+  level?: string;
+  fps_mode?: string;
+  scan_type?: string;
+  hdr?: string;
+  transfer?: string;
+  primaries?: string;
+  container?: string;
+  has_audio?: boolean;
+  audio_codec?: string;
+  jpeg_cmyk?: boolean;
+  jpeg_progressive?: boolean;
+  bars?: Bars | null;
 };
 
 export type PairKlass = 'EXACT' | 'TOLERANT' | 'MISMATCH' | 'BLOCKED';
@@ -118,6 +137,8 @@ export function evaluatePlaylist(content: Content, pl: Playlist, tolerance: numb
   pl.controllers.forEach((c) => {
     deviceBlockReasons(content, c).forEach((r) => blockReasons.push(multi ? `[${c.name}] ${r}` : r));
   });
+  // Cihazdan bağımsız, donanım çözücüyü kilitleyen dosya özellikleri (4:2:2, 10-bit H.264, CMYK...)
+  blockingIssues(content).forEach((i) => blockReasons.push(i.text));
 
   const dev = aspectDeviation(content, pl.targetWidth, pl.targetHeight);
   const feasible = blockReasons.length === 0;

@@ -12,10 +12,13 @@ import {
   DEFAULT_PLAYLISTS, hydratePlaylist, CONTROLLERS_LIST,
   type EditablePlaylist, type Playlist,
 } from '../data/terminalKadikoy';
-import { buildAssignment, evaluateForPlaylist, parseFps, h264Cap, type Content, type SingleEval } from '../utils/matching';
+import { buildAssignment, evaluateForPlaylist, parseFps, type Content, type SingleEval } from '../utils/matching';
+import { warningIssues } from '../utils/contentIssues';
 import AtamaPDF from '../components/AtamaPDF';
 import OlcuFoyuPDF from '../components/OlcuFoyuPDF';
-import VideoFixButton from '../components/VideoFixButton';
+import FixButton from '../components/FixButton';
+import PackagePanel from '../components/PackagePanel';
+import AgencyLinksPanel from '../components/AgencyLinksPanel';
 
 // İçerik/ekran oranını küçük bir kutu olarak çizer (dikey/yatay görsel teyit)
 function RatioBox({ w, h, tone = 'indigo' }: { w?: number; h?: number; tone?: 'indigo' | 'emerald' }) {
@@ -62,32 +65,20 @@ function playlistMeta(pl: Playlist): string {
   return `${pl.targetWidth}×${pl.targetHeight} · ${ratioLabel(pl.targetWidth, pl.targetHeight)} · ${pl.screenCount} ekran · ${ctrls}`;
 }
 
-// --- Otomatik video düzeltme (ffmpeg.wasm) yardımcıları ---
-function isVideoFile(file?: File): boolean {
-  if (!file) return false;
-  return file.type.startsWith('video/') || /\.(mp4|mov|avi|mkv|webm|m4v|ts)$/i.test(file.name);
-}
-// Çözünürlük engeli varsa transcoding (ölçek değiştirmeden) çözmez → düzeltme sunma.
-function hasResolutionBlock(blockReasons: string[]): boolean {
-  return blockReasons.some((r) => r.toLocaleLowerCase('tr-TR').includes('çözünürlük'));
-}
-// FPS/bitrate/codec engeli varsa (çözünürlük değil) düzeltilebilir kabul et.
-function isFixableByTranscode(file: File | undefined, blockReasons: string[]): boolean {
-  return isVideoFile(file) && blockReasons.length > 0 && !hasResolutionBlock(blockReasons);
-}
-function fixParamsFor(content: Content, pl: Playlist) {
-  const cap = h264Cap(pl);
-  const curFps = parseFps(content.avg_frame_rate);
-  return {
-    curFps: curFps ?? undefined,
-    curBitrateMbps: content.bit_rate ? content.bit_rate / 1_000_000 : undefined,
-    maxFps: cap.maxFps,
-    maxBitrateMbps: cap.maxBitrateMbps,
-  };
-}
-function fixDownloadName(content: Content): string {
-  const base = content.filename.replace(/\.[a-z0-9]+$/i, '') || 'video';
-  return `${base}_duzeltildi.mp4`;
+// Engel olmayan ama sorun çıkarabilecek dosya özellikleri (VFR, interlaced, HDR, siyah bant...)
+function WarnList({ c, className = '' }: { c: Content; className?: string }) {
+  const w = warningIssues(c);
+  if (!w.length) return null;
+  return (
+    <ul className={`text-[11px] text-amber-800 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1.5 space-y-0.5 ${className}`}>
+      {w.map((i) => (
+        <li key={i.code} className="flex items-start gap-1.5">
+          <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
+          <span>{i.text}{i.fix === 'agency' && <b> · ajans düzeltmeli</b>}</span>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 export default function Atama() {
@@ -504,6 +495,9 @@ export default function Atama() {
           )}
         </div>
 
+        {/* Ajans yükleme linkleri (admin) */}
+        <AgencyLinksPanel adminPw={adminPw} setAdminPw={setAdminPw} onImport={handleFiles} />
+
         {/* Yükleme alanı */}
         <div
           className={`relative bg-white rounded-2xl border-2 border-dashed shadow-sm flex flex-col items-center justify-center text-center p-8 transition-all ${isDragging ? 'border-primary bg-primary/5' : 'border-slate-300 hover:border-primary/50'}`}
@@ -570,6 +564,18 @@ export default function Atama() {
           </div>
         )}
 
+        {!analyzing && contents.length > 0 && (
+          <PackagePanel
+            entries={entries}
+            result={result}
+            singlePlaylist={singlePlaylist}
+            singleEvals={singleEvals}
+            tolerance={tolerance}
+            brand={renameLabel}
+            onBrand={setRenameLabel}
+          />
+        )}
+
         {analyzing && (
           <div className="flex items-center gap-2 text-sm text-primary bg-primary/5 border border-primary/20 rounded-lg px-4 py-2 w-fit">
             <Loader2 size={16} className="animate-spin" /> İçerikler analiz ediliyor...
@@ -612,18 +618,11 @@ export default function Atama() {
                         {s.blockReasons.map((r, i) => <li key={i}>{r}</li>)}
                       </ul>
                     )}
+                    <WarnList c={s.content} className="ml-12 mt-2" />
                     {(() => {
                       const file = fileById(s.content.id);
-                      if (s.feasible || !file || !isFixableByTranscode(file, s.blockReasons)) return null;
-                      return (
-                        <div className="ml-12">
-                          <VideoFixButton
-                            file={file}
-                            params={fixParamsFor(s.content, s.playlist)}
-                            downloadName={fixDownloadName(s.content)}
-                          />
-                        </div>
-                      );
+                      if (!file || s.deviation === null || s.deviation > tolerance) return null;
+                      return <div className="ml-12"><FixButton file={file} content={s.content} target={s.playlist} /></div>;
                     })()}
                   </div>
                 );
@@ -675,6 +674,8 @@ export default function Atama() {
                         <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" /> <span>{a.riskNote}</span>
                       </div>
                     )}
+                    <WarnList c={a.content} className="ml-12 mb-2" />
+                    {file && <div className="ml-12 mb-2 -mt-1"><FixButton file={file} content={a.content} target={a.playlist} compact /></div>}
                     {open && (
                       <div className="pb-4 pl-12 pr-2">
                         <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2">Tüm playlistlere karşı sıralama</div>
@@ -724,16 +725,11 @@ export default function Atama() {
                         {u.blockReasons.map((r, i) => <li key={i}>{r}</li>)}
                       </ul>
                     )}
+                    <WarnList c={u.content} className="mt-1.5" />
                     {(() => {
                       const file = fileById(u.content.id);
-                      if (u.kind !== 'DEVICE' || !u.bestPlaylist || !file || !isFixableByTranscode(file, u.blockReasons)) return null;
-                      return (
-                        <VideoFixButton
-                          file={file}
-                          params={fixParamsFor(u.content, u.bestPlaylist)}
-                          downloadName={fixDownloadName(u.content)}
-                        />
-                      );
+                      if (u.kind !== 'DEVICE' || !u.bestPlaylist || !file) return null;
+                      return <FixButton file={file} content={u.content} target={u.bestPlaylist} />;
                     })()}
                   </div>
                   <button onClick={() => removeEntry(u.content.id)} className="text-slate-300 hover:text-rose-500"><X size={16} /></button>
