@@ -62,7 +62,7 @@ export function contentIssues(c: Content): ContentIssue[] {
   if (c.scan_type && !/progressive/i.test(c.scan_type)) {
     out.push({ code: 'INTERLACED', level: 'warn', fix: 'auto', text: `Geçmeli (${c.scan_type}) video — LED'de tarak çizgisi/titreme görünür; progressive olmalı.` });
   }
-  if (c.hdr || /pq|2084|hlg/i.test(String(c.transfer || '')) || /2020/.test(String(c.primaries || ''))) {
+  if (c.hdr || /pq|2084|hlg/i.test(String(c.transfer || '')) || /2020/.test(`${c.primaries || ''} ${c.matrix || ''}`)) {
     out.push({ code: 'HDR', level: 'warn', fix: 'agency', text: 'HDR / BT.2020 renk — LED oynatıcıda soluk ya da yanlış renk görünür; ajanstan SDR (BT.709) çıktı isteyin.' });
   }
   if (/quicktime|matroska/i.test(String(c.container || ''))) {

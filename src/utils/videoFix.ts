@@ -13,8 +13,9 @@ let _log: string[] = [];
 let _queue: Promise<unknown> = Promise.resolve(); // tek ffmpeg örneği → işler sırayla
 
 // ESM çekirdek: @ffmpeg/ffmpeg worker'ı modül worker'dır; UMD çekirdeği yükleyemez.
-function coreBase(): string {
-  return new URL('ffmpeg/', new URL(import.meta.env.BASE_URL || './', window.location.href)).href;
+// (Çok çekirdekli @ffmpeg/core-mt 0.12 pthread'lerde 'function signature mismatch' ile çöktüğü için kullanılmıyor.)
+function coreBase(dir: string): string {
+  return new URL(`${dir}/`, new URL(import.meta.env.BASE_URL || './', window.location.href)).href;
 }
 
 export async function loadFFmpeg(): Promise<FFmpeg> {
@@ -23,11 +24,17 @@ export async function loadFFmpeg(): Promise<FFmpeg> {
   _loading = (async () => {
     const ff = new FFmpeg();
     ff.on('log', ({ message }) => { _log.push(message); if (_log.length > 60) _log.shift(); });
-    const base = coreBase();
-    await ff.load({
+    const base = coreBase('ffmpeg');
+    const load = ff.load({
       coreURL: await toBlobURL(`${base}ffmpeg-core.js`, 'text/javascript'),
       wasmURL: await toBlobURL(`${base}ffmpeg-core.wasm`, 'application/wasm'),
     });
+    // Worker başlatılamazsa ff.load hiç dönmez → kullanıcıyı sonsuz beklemede bırakma.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => { ff.terminate(); reject(new Error('Video motoru başlatılamadı (zaman aşımı). Sayfayı yenileyip tekrar deneyin.')); }, 45_000);
+    });
+    try { await Promise.race([load, timeout]); } finally { clearTimeout(timer); }
     _ffmpeg = ff;
     return ff;
   })();
@@ -55,13 +62,14 @@ async function transcodeVideo(file: File, plan: FixPlan, onProgress?: (r: number
   }
   vf.push('setsar=1', 'format=yuv420p');
 
-  const bufsize = Math.max(1, Math.round(plan.maxBitrateMbps * 2));
+  // Yarım saniyelik tampon: kısa ve çok detaylı videolarda bile ortalama bitrate tavanı aşmaz
+  const bufsize = Math.max(1, Math.floor(plan.maxBitrateMbps / 2));
   const args = [
     '-i', inName,
     '-map', '0:v:0', '-map', '0:a:0?',
     '-vf', vf.join(','),
     ...(plan.fps ? ['-r', String(plan.fps)] : []),
-    '-c:v', 'libx264', '-preset', 'veryfast', '-profile:v', 'high', '-crf', '20',
+    '-c:v', 'libx264', '-preset', 'superfast', '-profile:v', 'high', '-crf', '20',
     '-maxrate', `${plan.maxBitrateMbps}M`, '-bufsize', `${bufsize}M`,
     '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
     '-movflags', '+faststart',

@@ -130,6 +130,8 @@ export const analyzeMediaLocally = async (file: File): Promise<any> => {
           hdr: safeString(videoTrack.HDR_Format),
           transfer: safeString(videoTrack.transfer_characteristics),
           primaries: safeString(videoTrack.colour_primaries),
+          matrix: safeString(videoTrack.matrix_coefficients),
+          fps_max: parseFloat(safeString(videoTrack.FrameRate_Maximum) || '0') || undefined,
           container: safeString(general?.Format),
           has_audio: audio.length > 0,
           audio_codec: audio.length ? safeString(audio[0].Format) : undefined,

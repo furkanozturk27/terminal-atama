@@ -11,7 +11,7 @@ type Link = { token: string; campaign: string; agency: string; createdAt: number
 
 type Props = { adminPw: string; setAdminPw: (s: string) => void; onImport: (files: File[]) => void };
 
-const mb = (n: number) => `${(n / 1024 / 1024).toFixed(1)} MB`;
+const mb = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(1)} MB`);
 const when = (t: number) => new Date(t).toLocaleString('tr-TR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 const dl = (url: string) => url + (url.includes('?') ? '&' : '?') + 'download=1';
 

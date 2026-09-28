@@ -39,6 +39,7 @@ function judge(c: Content, playlists: Playlist[]): Verdict {
   return { kind: 'nofit', nearest };
 }
 
+const sizeText = (n: number) => (n < 1024 * 1024 ? `${Math.max(1, Math.round(n / 1024))} KB` : `${(n / 1048576).toFixed(1)} MB`);
 const safePath = (name: string) => name.normalize('NFKD').replace(/[^\w.\-]+/g, '_').replace(/_+/g, '_').slice(-120) || 'dosya';
 
 export default function AjansPortal({ token }: { token: string }) {
@@ -154,7 +155,7 @@ export default function AjansPortal({ token }: { token: string }) {
     <div className="min-h-screen bg-slate-50 px-4 py-6 md:px-10 md:py-10">
       <div className="max-w-4xl mx-auto space-y-5">
         <div>
-          <div className="text-xs font-bold uppercase tracking-wider text-primary mb-1">Pixecta · Terminal Kadıköy</div>
+          <div className="text-xs font-bold uppercase tracking-wider text-primary mb-1"><span lang="en">Pixecta</span> · Terminal Kadıköy</div>
           <h1 className="text-2xl md:text-3xl font-bold text-slate-800">{link.campaign}</h1>
           <p className="text-slate-500 mt-1 text-sm">
             {link.agency && <>{link.agency} · </>}İçeriklerinizi yükleyin; sistem her dosyanın hangi ekrana uyduğunu ve ekranda sorunsuz oynayıp oynamayacağını anında kontrol eder.
@@ -245,7 +246,7 @@ export default function AjansPortal({ token }: { token: string }) {
                       </div>
                       <div className="text-xs text-slate-400">
                         {e.analyzing ? 'Kontrol ediliyor…' : e.error ? e.error : e.metadata?.width
-                          ? [`${e.metadata.width}×${e.metadata.height}`, e.metadata.codec_name, fps ? `${Math.round(fps * 100) / 100} fps` : '', e.metadata.bit_rate ? `${(e.metadata.bit_rate / 1e6).toFixed(1)} Mbps` : '', `${(e.file.size / 1048576).toFixed(1)} MB`].filter(Boolean).join(' · ')
+                          ? [`${e.metadata.width}×${e.metadata.height}`, e.metadata.codec_name, fps ? `${Math.round(fps * 100) / 100} fps` : '', e.metadata.bit_rate ? `${(e.metadata.bit_rate / 1e6).toFixed(1)} Mbps` : '', sizeText(e.file.size)].filter(Boolean).join(' · ')
                           : 'Çözünürlük okunamadı'}
                       </div>
                       {v?.kind === 'ok' && <div className="mt-1.5 text-sm font-semibold text-emerald-700 flex items-center gap-1.5"><CheckCircle2 size={15} /> Uygun → {v.ev.playlist.name}</div>}

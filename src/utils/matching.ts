@@ -29,6 +29,8 @@ export type Content = {
   hdr?: string;
   transfer?: string;
   primaries?: string;
+  matrix?: string;
+  fps_max?: number;
   container?: string;
   has_audio?: boolean;
   audio_codec?: string;

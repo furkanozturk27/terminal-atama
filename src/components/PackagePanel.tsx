@@ -53,6 +53,8 @@ export default function PackagePanel({ entries, result, singlePlaylist, singleEv
       result.assignments.forEach((a) => push(a.content, a.playlist));
       result.unmatchedContents.forEach((u) => {
         if (u.kind === 'DEVICE' && u.bestPlaylist) push(u.content, u.bestPlaylist, 'Cihaz engeli');
+        // 1'e 1 eşleşmede yer kalmadı ama ekrana uygun: aynı ekranın klasörüne alternatif içerik olarak girer
+        else if (u.kind === 'CONTENTION' && u.bestPlaylist) push(u.content, u.bestPlaylist, 'Aynı ekrana ek içerik');
         else skipped.push({
           content: u.content,
           reason: u.kind === 'NO_FIT' ? 'Hiçbir ekrana oran uymuyor'
@@ -186,7 +188,7 @@ export default function PackagePanel({ entries, result, singlePlaylist, singleEv
       <div className="p-5 space-y-2">
         <p className="text-[11px] text-slate-500">
           Her dosya atandığı ekranın klasörüne konur. Gereken dosyalar düzeltilir, çıktı yeniden analiz edilip ekrana karşı doğrulanır ve ZIP içine <b>RAPOR.txt</b> eklenir.
-          {hasVideoFix && ' Video düzeltme bu bilgisayarda yapılır (dosya hiçbir yere yüklenmez); 15–30 sn\'lik bir video genelde 1 dakikanın altında biter.'}
+          {hasVideoFix && ' Video düzeltme bu bilgisayarda yapılır (dosya hiçbir yere yüklenmez). Süre kabaca videonun uzunluğunun 2–5 katıdır: 30 sn\'lik büyük bir video 1–2,5 dk sürebilir; bu sırada sekmeyi kapatmayın.'}
         </p>
         <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
           {items.map((it) => {

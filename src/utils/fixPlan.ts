@@ -35,7 +35,7 @@ export function planFix(c: Content, pl: Playlist, opts: { scaleToTarget: boolean
   if (isImageContent(c)) {
     const outW = wantScale ? pl.targetWidth : srcW;
     const outH = wantScale ? pl.targetHeight : srcH;
-    if (wantScale) steps.push(`Çözünürlük ${srcW}×${srcH} → ${outW}×${outH} (ekrana birebir)`);
+    if (wantScale) steps.push(`Çözünürlük ${srcW}×${srcH} → ${outW}×${outH} (${outW * outH > srcW * srcH ? 'büyütülüyor — ajanstan tam ölçü istemek daha iyi' : 'ekrana birebir'})`);
     if (has('CMYK')) steps.push('CMYK → RGB');
     if (has('PROGRESSIVE')) steps.push('Progressive → baseline JPEG');
     const action = steps.length ? 'transcode' : 'copy';
@@ -49,9 +49,11 @@ export function planFix(c: Content, pl: Playlist, opts: { scaleToTarget: boolean
   let outW = wantScale ? even(pl.targetWidth) : even(srcW);
   let outH = wantScale ? even(pl.targetHeight) : even(srcH);
   if (!outW || !outH) { outW = srcW; outH = srcH; }
-  if (wantScale) steps.push(`Çözünürlük ${srcW}×${srcH} → ${outW}×${outH} (ekrana birebir)`);
+  if (wantScale) steps.push(`Çözünürlük ${srcW}×${srcH} → ${outW}×${outH} (${outW * outH > srcW * srcH ? 'büyütülüyor — ajanstan tam ölçü istemek daha iyi' : 'ekrana birebir'})`);
 
   const cap = h264Cap(pl);
+  // Tavanın %90'ı: kısa/gürültülü videolarda ortalama bitrate'in limiti aşmaması için pay bırak.
+  const rateCap = Math.max(1, Math.floor(cap.maxBitrateMbps * 0.9));
   const cur = parseFps(c.avg_frame_rate);
   let fps: number | undefined;
   if (cur && cur > cap.maxFps + 0.5) {
@@ -59,12 +61,14 @@ export function planFix(c: Content, pl: Playlist, opts: { scaleToTarget: boolean
     fps = cur / 2 <= cap.maxFps + 0.01 ? Math.round((cur / 2) * 1000) / 1000 : cap.maxFps;
     steps.push(`${fmtFps(cur)} fps → ${fmtFps(fps)} fps`);
   } else if (has('VFR')) {
-    fps = cur ? Math.min(Math.round(cur), cap.maxFps) : cap.maxFps;
+    // Ortalama FPS düşük çıkar (atlanan kareler); asıl hız maksimumdur.
+    const base = c.fps_max && c.fps_max >= (cur || 0) ? c.fps_max : cur;
+    fps = base ? Math.min(Math.round(base), cap.maxFps) : cap.maxFps;
     steps.push(`Değişken FPS → sabit ${fmtFps(fps)} fps`);
   }
 
   const mbps = c.bit_rate ? c.bit_rate / 1_000_000 : 0;
-  if (mbps > cap.maxBitrateMbps) steps.push(`Bitrate ${mbps.toFixed(1)} → ≤${cap.maxBitrateMbps} Mbps`);
+  if (mbps > rateCap) steps.push(`Bitrate ${mbps.toFixed(1)} → ≤${rateCap} Mbps (limit ${cap.maxBitrateMbps})`);
 
   const codec = String(c.codec_name || '').toLowerCase();
   const isAvc = codec === 'avc' || codec.includes('264');
@@ -78,7 +82,7 @@ export function planFix(c: Content, pl: Playlist, opts: { scaleToTarget: boolean
   const action = steps.length ? 'transcode' : 'copy';
   return {
     kind: 'video', target: pl, action, srcW, srcH, outW, outH, fps,
-    maxBitrateMbps: cap.maxBitrateMbps, deinterlace: has('INTERLACED'),
+    maxBitrateMbps: rateCap, deinterlace: has('INTERLACED'),
     steps, unfixable, outExt: action === 'transcode' ? '.mp4' : origExt,
   };
 }
