@@ -188,7 +188,7 @@ export default function AjansPortal({ token }: { token: string }) {
                   return (
                     <tr key={p.id}>
                       <td className="px-4 py-2 font-medium text-slate-800">{p.name}</td>
-                      <td className="px-3 py-2 font-semibold text-primary whitespace-nowrap">{p.targetWidth} × {p.targetHeight}</td>
+                      <td className="px-3 py-2 font-semibold text-primary whitespace-nowrap">{p.targetWidth} × {p.targetHeight}{p.altSizes?.length ? <span className="block text-[10px] font-normal text-slate-400">{p.altSizes.map((a) => `${a.w}×${a.h}`).join(', ')} de kabul</span> : null}</td>
                       <td className="px-3 py-2 text-slate-500">{p.targetHeight > p.targetWidth ? 'Dikey' : 'Yatay'}</td>
                       <td className="px-3 py-2 text-slate-500 whitespace-nowrap">MP4 H.264 · ≤{cap.maxFps} fps · ≤{cap.maxBitrateMbps} Mbps</td>
                       <td className="px-3 py-2 text-right">{entries.length > 0 && (covered.has(p.id) ? <CheckCircle2 size={15} className="text-emerald-500 inline" /> : <span className="text-[10px] text-slate-400">içerik yok</span>)}</td>
@@ -250,6 +250,7 @@ export default function AjansPortal({ token }: { token: string }) {
                           : 'Çözünürlük okunamadı'}
                       </div>
                       {v?.kind === 'ok' && <div className="mt-1.5 text-sm font-semibold text-emerald-700 flex items-center gap-1.5"><CheckCircle2 size={15} /> Uygun → {v.ev.playlist.name}</div>}
+                      {v && 'ev' in v && v.kind !== 'blocked' && v.ev.sizeNote && <div className="mt-1 text-[12px] text-sky-800">ⓘ {v.ev.sizeNote}</div>}
                       {v?.kind === 'risky' && (
                         <>
                           <div className="mt-1.5 text-sm font-semibold text-amber-700 flex items-center gap-1.5"><AlertTriangle size={15} /> Kullanılabilir ama dikkat → {v.ev.playlist.name}</div>

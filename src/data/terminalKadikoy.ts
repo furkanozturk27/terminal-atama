@@ -57,6 +57,8 @@ export type EditablePlaylist = {
   targetHeight: number;
   controllerNames: string[]; // bu playlistteki ekranların cihazları (hepsi oynatabilmeli)
   screenCount: number;   // kaç fiziksel ekran (yalnızca gösterim)
+  // Hedefe ek olarak "birebir" kabul edilen ölçüler (ör. CEZAYİR: ajansa 700×1225 istenir, ekran 700×1224)
+  altSizes?: { w: number; h: number }[];
 };
 
 // Çalışma zamanı playlist (cihazlar çözülmüş)
@@ -73,8 +75,8 @@ export const DEFAULT_PLAYLISTS: EditablePlaylist[] = [
   { id: 'merdiven', name: 'MERDİVEN EKRANLAR', targetWidth: 1536, targetHeight: 1024, controllerNames: ['TB60'], screenCount: 2 },
   { id: 'arabica', name: 'ARABICA / PARİBU ART KÖŞE', targetWidth: 1344, targetHeight: 588, controllerNames: ['TU40 PRO', 'TB40'], screenCount: 2 },
   { id: 'kahve', name: 'KAHVE DÜNYASI YANI', targetWidth: 1008, targetHeight: 588, controllerNames: ['TB40'], screenCount: 1 },
-  { id: 'cezayir', name: 'CEZAYİR USTA / CAFER EROĞLU', targetWidth: 700, targetHeight: 1225, controllerNames: ['TB40', 'TB50'], screenCount: 2 },
-  { id: 'rossman', name: 'ROSSMAN YANI', targetWidth: 504, targetHeight: 840, controllerNames: ['T1-4G'], screenCount: 1 },
-  { id: 'paribu-duvar', name: 'PARİBU ART DUVAR YANI', targetWidth: 336, targetHeight: 672, controllerNames: ['T1-4G'], screenCount: 1 },
+  { id: 'cezayir', name: 'CEZAYİR USTA / CAFER EROĞLU', targetWidth: 700, targetHeight: 1225, altSizes: [{ w: 700, h: 1224 }], controllerNames: ['TB40', 'TB50'], screenCount: 2 },
+  { id: 'rossman', name: 'ROSSMAN YANI', targetWidth: 864, targetHeight: 1440, controllerNames: ['T1-4G'], screenCount: 1 },
+  { id: 'paribu-duvar', name: 'PARİBU ART DUVAR YANI', targetWidth: 576, targetHeight: 1152, controllerNames: ['T1-4G'], screenCount: 1 },
   { id: 'raketler', name: 'RAKETLER', targetWidth: 336, targetHeight: 588, controllerNames: ['T1-4G'], screenCount: 7 },
 ];

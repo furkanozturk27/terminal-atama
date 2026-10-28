@@ -85,6 +85,7 @@ const s = StyleSheet.create({
   bAmber: { backgroundColor: C.amberBg, color: C.amber, borderColor: C.amberBd },
   bRose: { backgroundColor: C.roseBg, color: C.rose, borderColor: C.roseBd },
 
+  infoNote: { marginTop: 6, fontSize: 8, color: '#075985', lineHeight: 1.45, backgroundColor: '#f0f9ff', borderLeftWidth: 2, borderLeftColor: '#38bdf8', paddingVertical: 4, paddingHorizontal: 8 },
   note: { marginTop: 8, marginLeft: 0, fontSize: 8, color: C.amber, lineHeight: 1.45, backgroundColor: C.amberBg, borderLeftWidth: 2, borderLeftColor: '#f59e0b', borderTopLeftRadius: 2, borderBottomLeftRadius: 2, paddingVertical: 5, paddingHorizontal: 8 },
 
   // Flag rows (uymayan / boş)
@@ -135,6 +136,7 @@ const AtamaPDF: React.FC<Props> = ({ result, tolerance, locationName = 'Terminal
         {screenCell(a)}
         <View style={s.colStatus}><Text style={[s.badge, s.bGreen]}>✓ TAM UYUM</Text></View>
       </View>
+      {a.sizeNote && <Text style={s.infoNote}>{a.sizeNote}</Text>}
     </View>
   );
 

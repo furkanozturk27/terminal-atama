@@ -154,10 +154,27 @@ export function evaluatePlaylist(content: Content, pl: Playlist, tolerance: numb
   return { feasible, blockReasons, deviation: dev, klass, assignable };
 }
 
-// Birebir ölçü: 1-2 piksellik kodlama yuvarlamalarını (örn. 1224↔1225) tolere et.
+// Birebir ölçü: hedef (veya playlistin ek kabul ölçüleri) ile aynı ise birebir.
+// ±1 px fark da birebir kabul edilir ama not düşülür ("yükseklik 1 px fazla" gibi).
+export type SizeMatch = { exact: boolean; note?: string };
+export function sizeMatch(c: Content, pl: Playlist): SizeMatch {
+  if (!c.width || !c.height) return { exact: false };
+  const sizes = [{ w: pl.targetWidth, h: pl.targetHeight }, ...(pl.altSizes || [])];
+  if (sizes.some((s) => s.w === c.width && s.h === c.height)) return { exact: true };
+  for (const s of sizes) {
+    const dw = c.width - s.w, dh = c.height - s.h;
+    if (Math.abs(dw) <= 1 && Math.abs(dh) <= 1) {
+      const parts = [
+        ...(dw ? [`genişlik 1 px ${dw > 0 ? 'fazla' : 'az'}`] : []),
+        ...(dh ? [`yükseklik 1 px ${dh > 0 ? 'fazla' : 'az'}`] : []),
+      ];
+      return { exact: true, note: `İçerik ${c.width}×${c.height}, ekran ölçüsü ${s.w}×${s.h}: ${parts.join(', ')} — birebir kabul edildi.` };
+    }
+  }
+  return { exact: false };
+}
 export function isResolutionExact(c: Content, pl: Playlist): boolean {
-  const near = (a?: number, b?: number) => a !== undefined && b !== undefined && Math.abs(a - b) <= Math.max(2, b * 0.005);
-  return near(c.width, pl.targetWidth) && near(c.height, pl.targetHeight);
+  return sizeMatch(c, pl).exact;
 }
 export function riskNoteFor(c: Content, pl: Playlist): string {
   return `Ekranın birebir ölçüsü ${pl.targetWidth}×${pl.targetHeight}. İçerik ${c.width}×${c.height} olarak gönderildiği için bu ölçü döndürülerek/ölçeklenerek oynatılır — birebir değil, riskli.`;
@@ -177,12 +194,13 @@ export function h264Cap(pl: Playlist): { maxFps: number; maxBitrateMbps: number 
 }
 
 // Tek bir playlist için değerlendirme (manuel "sadece bu ekran" kontrolü)
-export type SingleEval = PairEval & { content: Content; playlist: Playlist; resolutionExact: boolean; riskNote?: string };
+export type SingleEval = PairEval & { content: Content; playlist: Playlist; resolutionExact: boolean; riskNote?: string; sizeNote?: string };
 export function evaluateForPlaylist(content: Content, pl: Playlist, tolerance: number): SingleEval {
   const ev = evaluatePlaylist(content, pl, tolerance);
-  const resolutionExact = ev.assignable && isResolutionExact(content, pl);
+  const sm = sizeMatch(content, pl);
+  const resolutionExact = ev.assignable && sm.exact;
   const riskNote = ev.assignable && !resolutionExact ? riskNoteFor(content, pl) : undefined;
-  return { ...ev, content, playlist: pl, resolutionExact, riskNote };
+  return { ...ev, content, playlist: pl, resolutionExact, riskNote, sizeNote: resolutionExact ? sm.note : undefined };
 }
 
 // ---- Hungarian (Kuhn-Munkres), kare matris, min maliyet ----
@@ -232,6 +250,7 @@ export type Assignment = {
   klass: PairKlass;
   resolutionExact: boolean; // içerik çözünürlüğü hedef ölçüye birebir eşit mi
   riskNote?: string;        // ölçü farklıysa "hedef X olmalı, bu hâliyle riskli" uyarısı
+  sizeNote?: string;        // ±1 px farkla birebir kabul edildiyse açıklama
 };
 export type UnmatchKind = 'INVALID' | 'NO_FIT' | 'DEVICE' | 'CONTENTION';
 export type UnmatchedContent = {
@@ -253,6 +272,7 @@ export type MatchResult = {
 
 // Katmanlı maliyet bantları (öncelik): atama sayısı > birebir uyum > az sapma > çözünürlük yakınlığı.
 const EXACT_BONUS = 1000;
+const RES_EXACT_BONUS = 100; // aynı oranlı ekranlar arasında ölçüsü birebir tutanı tercih et (ör. 4:7 CEZAYİR vs RAKETLER)
 const ESCAPE = 1e5;
 const INFEASIBLE = 1e9;
 const FORBIDDEN = 1e12;
@@ -291,7 +311,7 @@ export function buildAssignment(contents: Content[], playlists: Playlist[], tole
       if (i < nC && j < nP) {
         const ev = evalMatrix.get(contents[i].id)!.get(playlists[j].id)!;
         cost[i][j] = ev.assignable
-          ? ev.deviation! - (ev.klass === 'EXACT' ? EXACT_BONUS : 0) + RES_EPS * resDistance(contents[i], playlists[j])
+          ? ev.deviation! - (ev.klass === 'EXACT' ? EXACT_BONUS : 0) - (isResolutionExact(contents[i], playlists[j]) ? RES_EXACT_BONUS : 0) + RES_EPS * resDistance(contents[i], playlists[j])
           : INFEASIBLE;
       } else if (i < nC && j >= nP) {
         cost[i][j] = j - nP === i ? ESCAPE : FORBIDDEN;
@@ -312,9 +332,10 @@ export function buildAssignment(contents: Content[], playlists: Playlist[], tole
       const ev = evalMatrix.get(contents[i].id)!.get(playlists[j].id)!;
       const pl = playlists[j];
       const c = contents[i];
-      const resolutionExact = isResolutionExact(c, pl);
+      const sm = sizeMatch(c, pl);
+      const resolutionExact = sm.exact;
       const riskNote = resolutionExact ? undefined : riskNoteFor(c, pl);
-      result.assignments.push({ content: c, playlist: pl, deviation: ev.deviation!, klass: ev.klass, resolutionExact, riskNote });
+      result.assignments.push({ content: c, playlist: pl, deviation: ev.deviation!, klass: ev.klass, resolutionExact, riskNote, sizeNote: sm.note });
       matchedPlaylistIds.add(pl.id);
     } else {
       const row = evalMatrix.get(contents[i].id)!;

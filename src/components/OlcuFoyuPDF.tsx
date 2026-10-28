@@ -120,7 +120,7 @@ const OlcuFoyuPDF: React.FC<Props> = ({ playlists, locationName = 'Terminal Kad�
           return (
             <View key={i} style={s.row} wrap={false}>
               <View style={s.cEkran}><Text style={s.ekran}>{p.name}</Text></View>
-              <View style={s.cOlcu}><Text style={s.olcu}>{p.targetWidth} × {p.targetHeight}</Text><Text style={s.olcuSub}>{ratioLabel(p.targetWidth, p.targetHeight)} · piksel</Text></View>
+              <View style={s.cOlcu}><Text style={s.olcu}>{p.targetWidth} × {p.targetHeight}</Text><Text style={s.olcuSub}>{ratioLabel(p.targetWidth, p.targetHeight)} · piksel{p.altSizes?.length ? ` · ${p.altSizes.map((a) => `${a.w}×${a.h}`).join(', ')} de kabul` : ''}</Text></View>
               <Text style={[s.cell, s.cYon]}>{portrait ? 'Dikey' : 'Yatay'}</Text>
               <Text style={[s.cell, s.cAdet]}>{p.screenCount}</Text>
               <View style={s.cCihaz}>

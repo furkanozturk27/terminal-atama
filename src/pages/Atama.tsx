@@ -3,7 +3,7 @@ import {
   Upload as UploadIcon, Monitor, CheckCircle, AlertTriangle, X, Loader2,
   ArrowRight, FileVideo, Image as ImageIcon, ChevronDown, ChevronUp, Server, Inbox, Download, Layers,
   Settings2, Plus, Trash2, RotateCcw, FileDown, FileUp, FileText, Cloud, CloudUpload, Loader2 as Spinner,
-  Tag, Copy, Check, Archive, Target,
+  Tag, Copy, Check, Archive, Target, Info,
 } from 'lucide-react';
 import { zipSync } from 'fflate';
 import { pdf } from '@react-pdf/renderer';
@@ -51,6 +51,18 @@ function loadPlaylists(): EditablePlaylist[] {
   } catch { /* ignore */ }
   return DEFAULT_PLAYLISTS;
 }
+
+// "700x1224, 704x1225" → [{w,h}] ; bulut/JSON'dan gelen diziyi de doğrular
+function normAltSizes(v: unknown): { w: number; h: number }[] | undefined {
+  const arr = Array.isArray(v) ? v : [];
+  const out = arr.map((x: any) => ({ w: Number(x?.w) || 0, h: Number(x?.h) || 0 })).filter((x) => x.w > 0 && x.h > 0);
+  return out.length ? out : undefined;
+}
+function parseAltSizes(text: string): { w: number; h: number }[] | undefined {
+  const out = [...text.matchAll(/(\d{2,5})\s*[x×X*]\s*(\d{2,5})/g)].map((m) => ({ w: +m[1], h: +m[2] }));
+  return out.length ? out : undefined;
+}
+const altText = (a?: { w: number; h: number }[]) => (a || []).map((s) => `${s.w}x${s.h}`).join(', ');
 
 function gcd(a: number, b: number): number { return b ? gcd(b, a % b) : a; }
 function ratioLabel(w?: number, h?: number): string {
@@ -127,6 +139,7 @@ export default function Atama() {
             targetHeight: Number(p.targetHeight) || 0,
             controllerNames: Array.isArray(p.controllerNames) ? p.controllerNames.map(String) : [],
             screenCount: Number(p.screenCount) || 1,
+            altSizes: normAltSizes(p.altSizes),
           })));
           setCloudState('cloud');
         } else {
@@ -327,6 +340,7 @@ export default function Atama() {
           targetWidth: p.targetWidth, targetHeight: p.targetHeight,
           controllerNames: Array.isArray(p.controllerNames) ? p.controllerNames.map(String) : [],
           screenCount: typeof p.screenCount === 'number' ? p.screenCount : 1,
+          altSizes: normAltSizes(p.altSizes),
         }));
         setEditablePlaylists(normalized);
         alert('Ekran ayarları içe aktarıldı.');
@@ -440,6 +454,10 @@ export default function Atama() {
                       <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1">Ekran Sayısı</label>
                       <input type="number" min={1} value={p.screenCount} onChange={(e) => updateRow(p.id, { screenCount: parseInt(e.target.value) || 1 })}
                         className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" />
+                    </div>
+                    <div className="w-36">
+                      <label className="block text-[10px] font-bold uppercase tracking-wide text-slate-400 mb-1" title="Bu ölçüler de birebir kabul edilir (virgülle ayır)">Ek Kabul Ölçü</label>
+                      <AltSizeInput value={p.altSizes} onChange={(v) => updateRow(p.id, { altSizes: v })} />
                     </div>
                     <button onClick={() => deleteRow(p.id)} className="text-slate-300 hover:text-rose-500 p-2" title="Sil"><Trash2 size={16} /></button>
                   </div>
@@ -608,6 +626,11 @@ export default function Atama() {
                       </div>
                       <span className={`text-[11px] font-bold px-2.5 py-1 rounded-md border whitespace-nowrap ${badge.cls}`}>{badge.txt}</span>
                     </div>
+                    {s.sizeNote && (
+                      <div className="ml-12 mt-2 text-[11px] text-sky-800 bg-sky-50 border border-sky-100 rounded-md px-2.5 py-1.5 flex items-start gap-1.5">
+                        <Info size={13} className="flex-shrink-0 mt-0.5" /> <span>{s.sizeNote}</span>
+                      </div>
+                    )}
                     {s.riskNote && (
                       <div className="ml-12 mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1.5 flex items-start gap-1.5">
                         <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" /> <span>{s.riskNote}</span>
@@ -669,6 +692,11 @@ export default function Atama() {
                       </span>
                       {open ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
                     </div>
+                    {a.sizeNote && (
+                      <div className="ml-12 mb-2 text-[11px] text-sky-800 bg-sky-50 border border-sky-100 rounded-md px-2.5 py-1.5 flex items-start gap-1.5">
+                        <Info size={13} className="flex-shrink-0 mt-0.5" /> <span>{a.sizeNote}</span>
+                      </div>
+                    )}
                     {a.riskNote && (
                       <div className="ml-12 mb-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-2.5 py-1.5 flex items-start gap-1.5">
                         <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" /> <span>{a.riskNote}</span>
@@ -829,6 +857,16 @@ export default function Atama() {
         )}
       </div>
     </div>
+  );
+}
+
+// Yazarken bozulmasın diye metni yerelde tutar, odaktan çıkınca ayrıştırır
+function AltSizeInput({ value, onChange }: { value?: { w: number; h: number }[]; onChange: (v?: { w: number; h: number }[]) => void }) {
+  const [text, setText] = useState(altText(value));
+  useEffect(() => { setText(altText(value)); }, [value]);
+  return (
+    <input value={text} placeholder="örn. 700x1224" onChange={(e) => setText(e.target.value)} onBlur={() => onChange(parseAltSizes(text))}
+      className="w-full px-2.5 py-1.5 rounded-lg border border-slate-200 text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none" />
   );
 }
 
