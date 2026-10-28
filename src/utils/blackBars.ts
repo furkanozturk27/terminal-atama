@@ -4,17 +4,18 @@
 
 export type Bars = { top: number; bottom: number; left: number; right: number }; // kaynak piksel
 
-const SAMPLE_LONG = 256; // analiz çözünürlüğü (uzun kenar)
-const LUMA_MAX = 28; // bu değerin altı "siyah"
-const BLACK_SHARE = 0.985; // satır/sütundaki piksellerin bu oranı siyahsa satır siyahtır
+// Gerçek letterbox/pillarbox bandı saf siyahtır ve içinde hiçbir içerik yoktur.
+// Koyu tasarım öğeleri (ör. koyu mor zemin üzerinde küçük yasal metin şeridi) bant SAYILMAMALI.
+const SAMPLE_LONG = 640; // analiz çözünürlüğü (uzun kenar) — küçük yazılar küçültmede kaybolmasın
+const CHANNEL_MAX = 22; // piksel "siyah" = R, G ve B'nin hepsi bu değerin altında (koyu renkler değil)
+const BLACK_SHARE = 0.998; // satırın neredeyse tamamı siyah olmalı (yalnızca sıkıştırma gürültüsü payı)
 
 function barsOnCanvas(ctx: CanvasRenderingContext2D, w: number, h: number): Bars | null {
   const { data } = ctx.getImageData(0, 0, w, h);
   const dark = new Uint8Array(w * h);
   let darkTotal = 0;
   for (let i = 0, p = 0; i < dark.length; i++, p += 4) {
-    const y = 0.2126 * data[p] + 0.7152 * data[p + 1] + 0.0722 * data[p + 2];
-    if (y < LUMA_MAX) { dark[i] = 1; darkTotal++; }
+    if (data[p] <= CHANNEL_MAX && data[p + 1] <= CHANNEL_MAX && data[p + 2] <= CHANNEL_MAX) { dark[i] = 1; darkTotal++; }
   }
   if (darkTotal > dark.length * 0.9) return null; // kare neredeyse tamamen karanlık → karar verilemez
   const rowBlack = (y: number) => { let n = 0; for (let x = 0; x < w; x++) n += dark[y * w + x]; return n >= w * BLACK_SHARE; };
@@ -43,7 +44,7 @@ function finalize(frames: Bars[], w: number, h: number, srcW: number, srcH: numb
   const toSrcY = (v: number) => Math.round((v * srcH) / h);
   const toSrcX = (v: number) => Math.round((v * srcW) / w);
   const out: Bars = { top: toSrcY(min('top')), bottom: toSrcY(min('bottom')), left: toSrcX(min('left')), right: toSrcX(min('right')) };
-  const sig = (px: number, dim: number) => (px >= Math.max(4, dim * 0.02) ? px : 0);
+  const sig = (px: number, dim: number) => (px >= Math.max(6, dim * 0.02) ? px : 0);
   out.top = sig(out.top, srcH); out.bottom = sig(out.bottom, srcH);
   out.left = sig(out.left, srcW); out.right = sig(out.right, srcW);
   return out.top || out.bottom || out.left || out.right ? out : null;
@@ -77,7 +78,8 @@ export async function detectVideoBars(file: File, srcW: number, srcH: number): P
   try {
     await once('loadeddata', 8000); // tarayıcının çözemediği codec'lerde (ProRes vb.) burada düşer
     const dur = isFinite(video.duration) && video.duration > 0 ? video.duration : 0;
-    const times = dur ? [0.2, 0.5, 0.8].map((r) => r * dur) : [0];
+    // Bant videonun tamamında olmalı: 5 farklı anda da görülmesi şart
+    const times = dur ? [0.1, 0.3, 0.5, 0.7, 0.9].map((r) => r * dur) : [0];
     const { ctx, w, h } = makeCanvas(srcW || video.videoWidth, srcH || video.videoHeight);
     const frames: Bars[] = [];
     for (const t of times) {
