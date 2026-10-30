@@ -111,8 +111,10 @@ async function transcodeImage(file: File, plan: FixPlan): Promise<Blob> {
   ctx.imageSmoothingQuality = 'high';
   ctx.drawImage(bmp, (plan.outW - dw) / 2, (plan.outH - dh) / 2, dw, dh);
   bmp.close();
+  // Kalite 1.0 şart: tarayıcı altında renk çözünürlüğünü yarıya indirir (4:2:0) ve
+  // küçük görsellerde kırmızı yazı kenarlarını bozar; 1.0 ise 4:4:4 korur (ölçüm: en fazla 3/255 fark).
   return await new Promise<Blob>((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Görsel kodlanamadı'))), 'image/jpeg', 0.93));
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('Görsel kodlanamadı'))), 'image/jpeg', 1));
 }
 
 // Planı uygula. Video işleri tek ffmpeg örneği üzerinde sıraya girer.
