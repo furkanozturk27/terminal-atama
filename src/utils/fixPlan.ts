@@ -68,7 +68,8 @@ export function planFix(c: Content, pl: Playlist, opts: { scaleToTarget: boolean
   }
 
   const mbps = c.bit_rate ? c.bit_rate / 1_000_000 : 0;
-  if (mbps > rateCap) steps.push(`Bitrate ${mbps.toFixed(1)} → ≤${rateCap} Mbps (limit ${cap.maxBitrateMbps})`);
+  // Yalnızca cihazın GERÇEK limiti aşılıyorsa bitrate düzelt; düzeltirken hedef %90 (pay bırakır).
+  if (mbps > cap.maxBitrateMbps) steps.push(`Bitrate ${mbps.toFixed(1)} → ≤${rateCap} Mbps (limit ${cap.maxBitrateMbps})`);
 
   const codec = String(c.codec_name || '').toLowerCase();
   const isAvc = codec === 'avc' || codec.includes('264');
