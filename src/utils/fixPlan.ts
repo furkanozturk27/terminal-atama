@@ -18,6 +18,13 @@ export type FixPlan = {
   outExt: string;
 };
 
+// Ölçek değişimini açıkça söyle: büyük küçültme kalite kaybıdır ve çoğu zaman yanlış ekran ölçüsüne işarettir
+function scaleNote(srcW: number, srcH: number, outW: number, outH: number): string {
+  const r = (outW * outH) / Math.max(1, srcW * srcH);
+  if (r > 1.001) return 'büyütülüyor — ajanstan tam ölçü istemek daha iyi';
+  if (r < 0.75) return `küçültülüyor: piksel sayısı %${Math.round((1 - r) * 100)} azalır, kalite düşer — sistemdeki ekran ölçüsünün doğru olduğundan emin olun`;
+  return 'ekrana birebir';
+}
 const even = (n: number) => Math.max(2, Math.floor(n / 2) * 2);
 const fmtFps = (f: number) => (Math.abs(f - Math.round(f)) < 0.01 ? String(Math.round(f)) : f.toFixed(2));
 
@@ -35,7 +42,7 @@ export function planFix(c: Content, pl: Playlist, opts: { scaleToTarget: boolean
   if (isImageContent(c)) {
     const outW = wantScale ? pl.targetWidth : srcW;
     const outH = wantScale ? pl.targetHeight : srcH;
-    if (wantScale) steps.push(`Çözünürlük ${srcW}×${srcH} → ${outW}×${outH} (${outW * outH > srcW * srcH ? 'büyütülüyor — ajanstan tam ölçü istemek daha iyi' : 'ekrana birebir'})`);
+    if (wantScale) steps.push(`Çözünürlük ${srcW}×${srcH} → ${outW}×${outH} (${scaleNote(srcW, srcH, outW, outH)})`);
     if (has('CMYK')) steps.push('CMYK → RGB');
     if (has('PROGRESSIVE')) steps.push('Progressive → baseline JPEG');
     const action = steps.length ? 'transcode' : 'copy';
@@ -49,7 +56,7 @@ export function planFix(c: Content, pl: Playlist, opts: { scaleToTarget: boolean
   let outW = wantScale ? even(pl.targetWidth) : even(srcW);
   let outH = wantScale ? even(pl.targetHeight) : even(srcH);
   if (!outW || !outH) { outW = srcW; outH = srcH; }
-  if (wantScale) steps.push(`Çözünürlük ${srcW}×${srcH} → ${outW}×${outH} (${outW * outH > srcW * srcH ? 'büyütülüyor — ajanstan tam ölçü istemek daha iyi' : 'ekrana birebir'})`);
+  if (wantScale) steps.push(`Çözünürlük ${srcW}×${srcH} → ${outW}×${outH} (${scaleNote(srcW, srcH, outW, outH)})`);
 
   const cap = h264Cap(pl);
   // Tavanın %90'ı: kısa/gürültülü videolarda ortalama bitrate'in limiti aşmaması için pay bırak.

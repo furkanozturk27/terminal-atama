@@ -188,7 +188,7 @@ export default function PackagePanel({ entries, result, singlePlaylist, singleEv
       <div className="p-5 space-y-2">
         <p className="text-[11px] text-slate-500">
           Her dosya atandığı ekranın klasörüne konur. Gereken dosyalar düzeltilir, çıktı yeniden analiz edilip ekrana karşı doğrulanır ve ZIP içine <b>RAPOR.txt</b> eklenir.
-          {hasVideoFix && ' Video düzeltme bu bilgisayarda yapılır (dosya hiçbir yere yüklenmez). Süre kabaca videonun uzunluğunun 2–5 katıdır: 30 sn\'lik büyük bir video 1–2,5 dk sürebilir; bu sırada sekmeyi kapatmayın.'}
+          {hasVideoFix && ' Video düzeltme bu bilgisayarda yapılır (dosya hiçbir yere yüklenmez). Kalite öncelikli kodlandığı için 15 sn\'lik bir video ekran boyutuna göre yaklaşık 30 sn – 3 dk sürer; bu sırada sekmeyi kapatmayın.'}
         </p>
         <div className="divide-y divide-slate-100 border border-slate-200 rounded-xl overflow-hidden">
           {items.map((it) => {

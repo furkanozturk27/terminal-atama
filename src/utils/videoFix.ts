@@ -69,7 +69,10 @@ async function transcodeVideo(file: File, plan: FixPlan, onProgress?: (r: number
     '-map', '0:v:0', '-map', '0:a:0?',
     '-vf', vf.join(','),
     ...(plan.fps ? ['-r', String(plan.fps)] : []),
-    '-c:v', 'libx264', '-preset', 'superfast', '-profile:v', 'high', '-crf', '20',
+    // Kalite öncelikli: LED cihazların bitrate payı geniş (50-80 Mbps). CRF 20/superfast ince dokuyu
+    // (fırçalanmış metal, koyu geçişler) yumuşatıyordu; CRF 12 + aq-mode 3 kaynağa çok daha yakın.
+    // Ölçüm (ProRes 864x1440, 15 sn): 4.3 -> 10.7 Mbps, SSIM 0.9941 -> 0.9950, tarayıcıda 36 -> 61 sn.
+    '-c:v', 'libx264', '-preset', 'veryfast', '-profile:v', 'high', '-crf', '12', '-x264-params', 'aq-mode=3',
     '-maxrate', `${plan.maxBitrateMbps}M`, '-bufsize', `${bufsize}M`,
     '-c:a', 'aac', '-b:a', '128k', '-ac', '2',
     '-movflags', '+faststart',
